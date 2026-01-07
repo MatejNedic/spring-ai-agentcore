@@ -153,16 +153,19 @@ private String extractUserFromContext(AgentCoreContext context) {
 
 ### Container Configuration
 
-The application is packaged as a Docker container optimized for AgentCore:
+The application is packaged as a Docker container using Spring Boot buildpacks, optimized for AgentCore ARM64 runtime:
 
-```dockerfile
-FROM --platform=linux/arm64 amazoncorretto:21-alpine
-WORKDIR /app
-COPY target/spring-ai-extended-chat-client-1.0.0-SNAPSHOT.jar app.jar
-USER appuser
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+```bash
+mvn spring-boot:build-image \
+  -Dspring-boot.build-image.imageName="${IMAGE_URI}" \
+  -Dspring-boot.build-image.builder.env.BP_ARCH=arm64
 ```
+
+This approach provides:
+- **Automatic optimization** with Cloud Native Buildpacks
+- **Efficient layer caching** for faster builds
+- **Security-hardened base images** 
+- **No Dockerfile maintenance** required
 
 ## Configuration
 
@@ -249,10 +252,10 @@ Build the application:
 mvn clean package
 ```
 
-Build Docker image:
+Build Docker image with Spring Boot buildpacks:
 
 ```bash
-docker build --platform linux/arm64 -t spring-ai-extended .
+mvn spring-boot:build-image -Dspring-boot.build-image.builder.env.BP_ARCH=arm64
 ```
 
 ## Requirements
