@@ -1,28 +1,32 @@
 package org.springaicommunity.example.agent;
 
+import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
+import org.springaicommunity.agentcore.context.AgentCoreContext;
+import org.springaicommunity.agentcore.context.AgentCoreHeaders;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springaicommunity.agentcore.context.AgentCoreContext;
-import org.springaicommunity.agentcore.context.AgentCoreHeaders;
-import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.stereotype.Service;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
-import java.util.List;
 import java.util.Map;
 
 @Service
 public class ExtendedChatController {
 
+	private static final String AUTHORIZATION_HEADER = "Authorization";
+	private static final String BEARER_PREFIX = "Bearer ";
+	private static final String ANONYMOUS_USER = "ANONYMOUS_USER";
+
 	private final ChatClient chatClient;
 	private final ChatMemory chatMemory;
-	private final ObjectMapper objectMapper = new ObjectMapper();
+	private final JwtUtil jwtUtil;
 
-	public ExtendedChatController(ChatClient.Builder chatClientBuilder, ChatMemoryRepository memoryRepository) {
+	public ExtendedChatController(ChatClient.Builder chatClientBuilder, 
+								  ChatMemoryRepository memoryRepository,
+								  JwtUtil jwtUtil) {
+		this.jwtUtil = jwtUtil;
 		this.chatMemory = MessageWindowChatMemory.builder()
 				.chatMemoryRepository(memoryRepository)
 				.maxMessages(10)
@@ -80,41 +84,18 @@ public class ExtendedChatController {
 	}
 
 	private String extractUserIdFromContext(AgentCoreContext context) {
-		try {
-			// Get Authorization header
-			String authHeader = context.getHeader("Authorization");
-			if (authHeader != null && authHeader.startsWith("Bearer ")) {
-				String token = authHeader.substring(7);
-				
-				// Decode JWT token (skip signature validation as AgentCore already validated it)
-				String[] parts = token.split("\\.");
-				if (parts.length >= 2) {
-					String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
-					Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
-					
-					// Try to get username from JWT claims
-					String username = (String) claims.get("username");
-					if (username != null) {
-						return username;
-					}
-					
-					// Fallback to 'sub' claim
-					String sub = (String) claims.get("sub");
-					if (sub != null) {
-						return sub;
-					}
-				}
+		// Get Authorization header
+		String authHeader = context.getHeader(AUTHORIZATION_HEADER);
+		
+		if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+			String token = authHeader.substring(BEARER_PREFIX.length());
+			String userId = jwtUtil.extractUserId(token);
+			if (userId != null) {
+				return userId;
 			}
-			
-			// Fallback to session ID if no user identity found
-			return "user-" + context.getHeader(AgentCoreHeaders.SESSION_ID);
-			
-		} catch (JsonProcessingException e) {
-			// Fallback to session ID if JWT parsing fails
-			return "user-" + context.getHeader(AgentCoreHeaders.SESSION_ID);
 		}
+		
+		// Fallback to anonymous user if no user identity found
+		return ANONYMOUS_USER;
 	}
-
-	public record ChatRequest(String message) {}
-	public record ChatResponse(String response) {}
 }

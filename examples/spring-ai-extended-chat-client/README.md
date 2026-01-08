@@ -1,16 +1,13 @@
 # Spring AI Extended Chat Client
 
-Spring AI chat client deployable into Bedrock AgentCore and uses authentication context with short-term memory.
+Spring AI chat client with OAuth authentication and per-user memory isolation, deployable to AWS Bedrock AgentCore Runtime.
 
 ## Features
 
-- **AgentCore Runtime Deployment**: Containerized deployment into AWS Bedrock AgentCore Runtime
 - **OAuth Authentication**: JWT Bearer token authentication via AWS Cognito
-- **Short-term Memory**: Per-user conversation memory using AgentCore Memory service
-- **User Identity Extraction**: Extracts user identity from OAuth JWT tokens
-- **Memory Isolation**: Each authenticated user has completely separate conversation history
+- **Memory Isolation**: Per-user conversation memory using AgentCore Memory service
 - **Spring AI Integration**: Powered by Spring AI ChatClient with Amazon Bedrock
-- **Containerized**: Docker-based deployment with ARM64 support
+- **AgentCore Deployment**: Containerized deployment with ARM64 support
 
 ## Architecture
 
@@ -20,12 +17,12 @@ Spring AI chat client deployable into Bedrock AgentCore and uses authentication 
 │   (Alice/Bob)   │    │  Runtime         │    │  Extended       │
 │                 │    │  + JWT Auth      │    │  Chat Client    │
 └─────────────────┘    │                  │    │                 │
-         │              │  ┌─────────────┐ │    │  ┌─────────────┐│
-         │              │  │  Memory     │ │◀───│  │  Amazon     ││
-         └──────────────┼─▶│  Service    │ │    │  │  Bedrock    ││
-           JWT Token    │  │ (Per-User)  │ │    │  └─────────────┘│
-                        │  └─────────────┘ │    └─────────────────┘
-                        └──────────────────┘
+        │              │  ┌─────────────┐ │    │  ┌─────────────┐│
+        │              │  │  Memory     │ │◀───│  │  Amazon     ││
+        └──────────────┼─▶│  Service    │ │    │  │  Bedrock    ││
+          JWT Token    │  │ (Per-User)  │ │    │  └─────────────┘│
+                       │  └─────────────┘ │    └─────────────────┘
+                       └──────────────────┘
 ```
 
 ## Quick Start
@@ -35,41 +32,36 @@ Spring AI chat client deployable into Bedrock AgentCore and uses authentication 
 - AWS CLI configured with appropriate permissions
 - Docker installed and running
 - Terraform >= 1.0
-- Java 17+
-- Maven 3.6+
+- Java 17+ and Maven 3.6+
 
-### Deploy to AgentCore Runtime
+### Deploy
 
-1. **Build and push the Docker image:**
+1. **Build and deploy:**
    ```bash
    ./build-and-push.sh
-   ```
-
-2. **Deploy the infrastructure:**
-   ```bash
    ./deploy.sh
    ```
 
-3. **Test the deployment:**
+2. **Test OAuth authentication and memory isolation:**
    ```bash
    ./test.sh
    ```
 
-The build script handles: building the app, creating the Docker image, and pushing to ECR.
-The deploy script handles: creating AgentCore Runtime, Memory, and OAuth authentication.
+### Manual Testing
 
-### Manual Testing with OAuth
-
-Test the deployed runtime using OAuth authentication:
+After deployment, get the runtime details:
 
 ```bash
-# Get deployment info
 cd terraform
 RUNTIME_NAME=$(terraform output -raw runtime_name)
 USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)
 CLIENT_ID=$(terraform output -raw cognito_client_id)
+```
 
-# Create test user
+Create a test user and get OAuth token:
+
+```bash
+# Create user
 aws cognito-idp admin-create-user \
   --user-pool-id $USER_POOL_ID \
   --username alice \
@@ -92,176 +84,76 @@ TOKEN=$(aws cognito-idp admin-initiate-auth \
   --auth-parameters USERNAME=alice,PASSWORD=AlicePass123! \
   --query 'AuthenticationResult.AccessToken' \
   --output text)
+```
 
-# Test with OAuth authentication
-python3 -c "
-import requests
-import urllib.parse
+Test the runtime:
 
-runtime_name = '$RUNTIME_NAME'
-token = '$TOKEN'
-
-url = f'https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/{urllib.parse.quote(runtime_name, safe=\"\")}/invocations?qualifier=DEFAULT'
-
-headers = {
-    'Authorization': f'Bearer {token}',
-    'Content-Type': 'application/json',
-    'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': 'test-session-123'
-}
-
-response = requests.post(url, headers=headers, json={'prompt': 'Hi, I am Alice and I work at AWS'})
-print(response.json())
-"
+```bash
+curl -X POST \
+  "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/$RUNTIME_NAME/invocations?qualifier=DEFAULT" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id: test-session-123" \
+  -d '{"prompt": "Hi, I am Alice and I work at AWS"}'
 ```
 
 ## How It Works
 
+### Authentication
+- Extracts user identity from JWT tokens using Nimbus JOSE + JWT library
+- Each authenticated user gets isolated conversation memory
+- Falls back to anonymous user if no valid token provided
+
 ### Memory Integration
+- Uses AgentCore Memory service for conversation persistence
+- Memory is scoped per user: `userId:sessionId`
+- Configurable message window size (default: 10 messages)
 
-The application uses AgentCore Memory service for conversation persistence:
-
-```java
-@AgentCoreInvocation
-public Map<String, Object> chat(Map<String, Object> request, AgentCoreContext context) {
-    String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-    String userId = extractUserFromContext(context);
-    String conversationId = userId + ":" + sessionId;
-    
-    // Memory-enabled chat with per-user isolation
-    String response = chatClient.prompt()
-        .user(prompt)
-        .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 10))
-        .call()
-        .content();
-}
+### Architecture
 ```
-
-### Authentication Context
-
-User identity is extracted from AgentCore context headers:
-
-```java
-private String extractUserFromContext(AgentCoreContext context) {
-    String authHeader = context.getHeader("Authorization");
-    if (authHeader != null && authHeader.startsWith("Bearer ")) {
-        // Extract user from JWT token
-        return parseJwtUsername(authHeader.substring(7));
-    }
-    return "anonymous";
-}
+OAuth Client → AgentCore Runtime → Spring AI Chat Client
+     ↓              ↓                      ↓
+JWT Token → User Identity → Per-User Memory → Amazon Bedrock
 ```
-
-### Container Configuration
-
-The application is packaged as a Docker container using Spring Boot buildpacks, optimized for AgentCore ARM64 runtime:
-
-```bash
-mvn spring-boot:build-image \
-  -Dspring-boot.build-image.imageName="${IMAGE_URI}" \
-  -Dspring-boot.build-image.builder.env.BP_ARCH=arm64
-```
-
-This approach provides:
-- **Automatic optimization** with Cloud Native Buildpacks
-- **Efficient layer caching** for faster builds
-- **Security-hardened base images** 
-- **No Dockerfile maintenance** required
 
 ## Configuration
 
-### Environment Variables
-
-The runtime is configured with:
-
-- `AGENTCORE_MEMORY_ID`: AgentCore Memory service ID
-- `SPRING_PROFILES_ACTIVE`: Spring profile (production)
-
-### Memory Settings
-
-Memory configuration in `application.properties`:
+Key configuration in `application.properties`:
 
 ```properties
-# AgentCore Memory integration
-agentcore.memory.enabled=true
-agentcore.memory.window-size=10
-
-# Spring AI Bedrock configuration
-spring.ai.bedrock.anthropic.chat.enabled=true
+# Spring AI Bedrock
 spring.ai.bedrock.anthropic.chat.model=anthropic.claude-3-sonnet-20240229-v1:0
+
+# Memory window size
+agentcore.memory.window-size=10
 ```
 
 ## Monitoring
 
-### Runtime Status
-
 Check runtime status:
-
 ```bash
-aws bedrock-agentcore-control get-runtime \
-  --runtime-name $RUNTIME_NAME \
-  --region us-east-1
+aws bedrock-agentcore-control get-runtime --runtime-name $RUNTIME_NAME --region us-east-1
 ```
 
-### Memory Status
-
-Check memory service status:
-
-```bash
-aws bedrock-agentcore-control get-memory \
-  --memory-id $MEMORY_ID \
-  --region us-east-1
-```
-
-### Logs
-
-View runtime logs through AWS CloudWatch or AgentCore console.
+View logs in AWS CloudWatch under `/aws/bedrock-agentcore/runtimes/` log group.
 
 ## Cleanup
 
 Remove all deployed resources:
-
 ```bash
 ./cleanup.sh
 ```
 
-This will remove:
-- AgentCore Runtime
-- AgentCore Memory
-- AWS Cognito User Pool and Client
-- ECR Repository and images
-
 ## Development
 
 ### Local Development
-
-For local development without AgentCore:
-
 ```bash
-# Set memory ID environment variable
 export AGENTCORE_MEMORY_ID=your-memory-id
-
-# Run locally
 mvn spring-boot:run
 ```
 
 ### Building
-
-Build the application:
-
 ```bash
 mvn clean package
+docker build --platform linux/arm64 -t spring-ai-extended .
 ```
-
-Build Docker image with Spring Boot buildpacks:
-
-```bash
-mvn spring-boot:build-image -Dspring-boot.build-image.builder.env.BP_ARCH=arm64
-```
-
-## Requirements
-
-- Java 17+
-- Spring Boot 3.x
-- AWS Bedrock access
-- AgentCore Runtime permissions
-- Docker for containerization
