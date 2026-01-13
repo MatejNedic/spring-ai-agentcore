@@ -16,13 +16,11 @@
 
 package org.springaicommunity.agentcore.controller;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
 import org.springaicommunity.agentcore.service.AgentCoreMethodInvoker;
+import org.springaicommunity.agentcore.service.SseNormalizer;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -33,17 +31,18 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import reactor.core.publisher.Flux;
-
 @RestController
 public class AgentCoreInvocationsController implements AgentCoreInvocationsHandler {
 
 	private final AgentCoreMethodInvoker invoker;
 
+	private final SseNormalizer sseNormalizer;
+
 	private final Logger logger = LoggerFactory.getLogger(AgentCoreInvocationsController.class);
 
-	public AgentCoreInvocationsController(AgentCoreMethodInvoker invoker) {
+	public AgentCoreInvocationsController(AgentCoreMethodInvoker invoker, SseNormalizer sseNormalizer) {
 		this.invoker = invoker;
+		this.sseNormalizer = sseNormalizer;
 	}
 
 	@PostMapping(value = "/invocations", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -65,43 +64,12 @@ public class AgentCoreInvocationsController implements AgentCoreInvocationsHandl
 	private Object handleInvocation(Object request, HttpHeaders headers) throws Exception {
 		try {
 			Object result = invoker.invokeAgentMethod(request, headers);
-			return normalizeForSse(result);
+			return sseNormalizer.normalize(result);
 		}
 		catch (AgentCoreInvocationException e) {
 			logger.error("Error trying to invoke AgentCoreInvocation method: " + e.getMessage(), e);
 			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
 		}
-	}
-
-	/**
-	 * Normalize Flux for SSE by splitting tokens on newlines. Each newline becomes an
-	 * empty string, which renders as an empty SSE data event. This preserves newline
-	 * semantics for markdown tables and code blocks.
-	 */
-	private Object normalizeForSse(Object result) {
-		if (result instanceof Flux<?> flux) {
-			return flux.flatMapIterable(this::splitOnNewlines);
-		}
-		return result;
-	}
-
-	private List<String> splitOnNewlines(Object item) {
-		String str = item instanceof String s ? s : String.valueOf(item);
-		if (!str.contains("\n")) {
-			return List.of(str);
-		}
-		// Split on newlines, interleave empty strings as newline markers
-		String[] parts = str.split("\n", -1);
-		List<String> result = new ArrayList<>();
-		for (int i = 0; i < parts.length; i++) {
-			if (i > 0) {
-				result.add(""); // newline marker
-			}
-			if (!parts[i].isEmpty()) {
-				result.add(parts[i]);
-			}
-		}
-		return result;
 	}
 
 }
