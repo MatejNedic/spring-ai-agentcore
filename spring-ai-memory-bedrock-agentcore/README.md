@@ -193,7 +193,7 @@ public interface ChatMemoryRepository {
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `agentcore.memory.memory-id` | String | null | AgentCore Memory ID (required) |
-| `agentcore.memory.total-events-limit` | Integer | null | Max events to retrieve - **controls context window size** (warning logged if null) |
+| `agentcore.memory.total-events-limit` | Integer | null | Max events to retrieve - **controls context window size** |
 | `agentcore.memory.default-session` | String | "default-session" | Default session name |
 | `agentcore.memory.page-size` | Integer | 100 | API pagination page size |
 | `agentcore.memory.ignore-unknown-roles` | Boolean | false | Handle unknown message roles gracefully |

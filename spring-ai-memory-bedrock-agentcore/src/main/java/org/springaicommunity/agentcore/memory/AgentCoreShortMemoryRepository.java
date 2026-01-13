@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.bedrockagentcore.model.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -137,11 +138,6 @@ public class AgentCoreShortMemoryRepository implements ChatMemoryRepository {
 		var nextToken = (String) null;
 		int requestPageSize = totalEventsLimit != null ? Math.min(pageSize, totalEventsLimit) : pageSize;
 
-		if (totalEventsLimit == null) {
-			logger.warn(
-					"total-events-limit not set - fetching all events. Consider setting a limit for production to control context window size.");
-		}
-
 		try {
 			do {
 				var requestBuilder = ListEventsRequest.builder()
@@ -166,6 +162,9 @@ public class AgentCoreShortMemoryRepository implements ChatMemoryRepository {
 			}
 			while (nextToken != null);
 
+			// AgentCore returns events in descending order (newest first),
+			// reverse to chronological order for LLM context
+			Collections.reverse(allEvents);
 			return allEvents;
 		}
 		catch (SdkException e) {
