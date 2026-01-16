@@ -55,12 +55,16 @@ public enum AgentCoreLongMemoryScope {
 	 * Builds the resolved namespace including session ID.
 	 * @param strategyId the memory strategy ID
 	 * @param actorId the actor ID
-	 * @param sessionId the session ID (ignored for ACTOR scope)
+	 * @param sessionId the session ID (required for SESSION scope, ignored for ACTOR)
 	 * @return the resolved namespace string
+	 * @throws IllegalArgumentException if SESSION scope and sessionId is null/empty
 	 */
 	public String buildNamespace(String strategyId, String actorId, String sessionId) {
 		String namespace = buildNamespace(strategyId, actorId);
-		if (sessionId != null) {
+		if (this == SESSION) {
+			if (sessionId == null || sessionId.isEmpty()) {
+				throw new IllegalArgumentException("sessionId is required for SESSION scope");
+			}
 			namespace = namespace.replace("{sessionId}", sessionId);
 		}
 		return namespace;

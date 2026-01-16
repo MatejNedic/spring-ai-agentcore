@@ -31,7 +31,7 @@ public class AgentCoreLongMemoryRetriever {
 	public AgentCoreLongMemoryRetriever(BedrockAgentCoreClient client, String memoryId) {
 		this.client = client;
 		this.memoryId = memoryId;
-		logger.debug("AgentCoreLongMemoryRetriever initialized with memoryId: {}", memoryId);
+		logger.info("AgentCoreLongMemoryRetriever initialized with memoryId: {}", memoryId);
 	}
 
 	/**
@@ -93,9 +93,7 @@ public class AgentCoreLongMemoryRetriever {
 	}
 
 	private String buildNamespace(AgentCoreLongMemoryScope scope, String strategyId, String actorId, String sessionId) {
-		if (scope == AgentCoreLongMemoryScope.SESSION && (sessionId == null || sessionId.isEmpty())) {
-			throw new IllegalArgumentException("sessionId is required for SESSION scope");
-		}
+		// Validation now handled by AgentCoreLongMemoryScope.buildNamespace()
 		return scope.buildNamespace(strategyId, actorId, sessionId);
 	}
 

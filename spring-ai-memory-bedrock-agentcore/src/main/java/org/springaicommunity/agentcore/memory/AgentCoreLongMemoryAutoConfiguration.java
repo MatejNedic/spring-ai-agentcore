@@ -2,6 +2,7 @@ package org.springaicommunity.agentcore.memory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.springaicommunity.agentcore.memory.AgentCoreLongMemoryAdvisor.Mode;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -24,25 +25,34 @@ import software.amazon.awssdk.services.bedrockagentcorecontrol.BedrockAgentCoreC
 @ConditionalOnBean({ BedrockAgentCoreClient.class, AgentCoreShortMemoryRepositoryConfiguration.class })
 public class AgentCoreLongMemoryAutoConfiguration {
 
+	/**
+	 * Factory for creating ControlClient instances. Allows tests to provide a mock
+	 * factory while production uses the default SDK client creation.
+	 */
 	@Bean
 	@ConditionalOnMissingBean
-	@ConditionalOnProperty(name = "agentcore.memory.long-term.enabled", havingValue = "true")
-	BedrockAgentCoreControlClient bedrockAgentCoreControlClient() {
-		return BedrockAgentCoreControlClient.create();
+	Supplier<BedrockAgentCoreControlClient> controlClientFactory() {
+		return BedrockAgentCoreControlClient::create;
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(name = "agentcore.memory.long-term.enabled", havingValue = "true")
 	AgentCoreLongMemoryRetriever agentCoreLongMemoryRetriever(BedrockAgentCoreClient client,
-			AgentCoreShortMemoryRepositoryConfiguration shortMemoryConfig, BedrockAgentCoreControlClient controlClient,
-			AgentCoreLongMemoryConfiguration config) {
+			AgentCoreShortMemoryRepositoryConfiguration shortMemoryConfig, AgentCoreLongMemoryConfiguration config,
+			Supplier<BedrockAgentCoreControlClient> controlClientFactory) {
 		String memoryId = shortMemoryConfig.memoryId();
 
 		// Validate namespaces at startup to fail fast on misconfiguration
+		// ControlClient is only needed for validation, so create/use/close inline
 		Map<String, AgentCoreLongMemoryScope> strategyConfigs = buildStrategyConfigs(config);
-		AgentCoreLongMemoryNamespaceValidator validator = new AgentCoreLongMemoryNamespaceValidator(controlClient);
-		validator.validateNamespaces(memoryId, strategyConfigs);
+		if (!strategyConfigs.isEmpty()) {
+			try (BedrockAgentCoreControlClient controlClient = controlClientFactory.get()) {
+				AgentCoreLongMemoryNamespaceValidator validator = new AgentCoreLongMemoryNamespaceValidator(
+						controlClient);
+				validator.validateNamespaces(memoryId, strategyConfigs);
+			}
+		}
 
 		return new AgentCoreLongMemoryRetriever(client, memoryId);
 	}

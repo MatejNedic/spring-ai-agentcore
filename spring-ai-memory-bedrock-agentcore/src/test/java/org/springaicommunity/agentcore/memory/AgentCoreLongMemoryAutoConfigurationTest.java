@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -199,7 +200,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 		}
 
 		@Bean
-		BedrockAgentCoreControlClient bedrockAgentCoreControlClient() {
+		Supplier<BedrockAgentCoreControlClient> controlClientFactory() {
 			BedrockAgentCoreControlClient controlClient = mock(BedrockAgentCoreControlClient.class);
 
 			// Mock GetMemory response with all strategies having correct namespace format
@@ -226,7 +227,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 				.build();
 
 			when(controlClient.getMemory(any(GetMemoryRequest.class))).thenReturn(response);
-			return controlClient;
+			return () -> controlClient;
 		}
 
 	}
