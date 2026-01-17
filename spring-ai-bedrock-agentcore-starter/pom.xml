@@ -79,7 +79,6 @@
             <version>${bucket4j-core.version}</version>
         </dependency>
 
-
         <!-- Optional Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -105,6 +104,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

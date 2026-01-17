@@ -52,8 +52,6 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 
 	private static final String SEMANTIC_STRATEGY_PROP = "agentcore.memory.long-term.semantic.strategy-id=semantic-123";
 
-	private static final String LTM_ENABLED_PROP = "agentcore.memory.long-term.enabled=true";
-
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(AgentCoreShortMemoryRepositoryAutoConfiguration.class,
 				AgentCoreLongMemoryAutoConfiguration.class));
@@ -75,7 +73,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should create semantic advisor when strategy ID configured")
 	void shouldCreateSemanticAdvisor() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP)
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP)
 			.run(context -> {
 				assertThat(context).hasSingleBean(AgentCoreLongMemoryRetriever.class);
 				assertThat(context).hasBean("semanticAdvisor");
@@ -90,7 +88,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should create user preference advisor when strategy ID configured")
 	void shouldCreateUserPreferenceAdvisor() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP,
 					"agentcore.memory.long-term.user-preference.strategy-id=prefs-456")
 			.run(context -> {
 				assertThat(context).hasBean("userPreferenceAdvisor");
@@ -105,7 +103,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should create summary advisor when strategy ID configured")
 	void shouldCreateSummaryAdvisor() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP,
 					"agentcore.memory.long-term.summary.strategy-id=summary-789")
 			.run(context -> {
 				assertThat(context).hasBean("summaryAdvisor");
@@ -120,7 +118,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should create episodic advisor when strategy ID configured")
 	void shouldCreateEpisodicAdvisor() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP,
 					"agentcore.memory.long-term.episodic.strategy-id=episodic-abc")
 			.run(context -> {
 				assertThat(context).hasBean("episodicAdvisor");
@@ -135,7 +133,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should create all 4 advisors when all strategy IDs configured")
 	void shouldCreateAllAdvisorsWhenAllConfigured() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP,
 					"agentcore.memory.long-term.user-preference.strategy-id=prefs-456",
 					"agentcore.memory.long-term.summary.strategy-id=summary-789",
 					"agentcore.memory.long-term.episodic.strategy-id=episodic-abc")
@@ -157,13 +155,12 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should use custom topK values")
 	void shouldUseCustomTopKValues() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
-					"agentcore.memory.long-term.semantic.top-k=10",
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP, "agentcore.memory.long-term.semantic.top-k=10",
 					"agentcore.memory.long-term.episodic.strategy-id=episodic-abc",
 					"agentcore.memory.long-term.episodic.episodes-top-k=5",
 					"agentcore.memory.long-term.episodic.reflections-top-k=3")
 			.run(context -> {
-				AgentCoreLongMemoryConfiguration config = context.getBean(AgentCoreLongMemoryConfiguration.class);
+				var config = context.getBean(AgentCoreLongMemoryProperties.class);
 				assertThat(config.semantic().topK()).isEqualTo(10);
 				assertThat(config.episodic().episodesTopK()).isEqualTo(5);
 				assertThat(config.episodic().reflectionsTopK()).isEqualTo(3);
@@ -174,7 +171,7 @@ class AgentCoreLongMemoryAutoConfigurationTest {
 	@DisplayName("Should collect all advisors via List injection")
 	void shouldCollectAllAdvisorsViaListInjection() {
 		contextRunner.withUserConfiguration(MockClientConfiguration.class)
-			.withPropertyValues(MEMORY_ID_PROP, LTM_ENABLED_PROP, SEMANTIC_STRATEGY_PROP,
+			.withPropertyValues(MEMORY_ID_PROP, SEMANTIC_STRATEGY_PROP,
 					"agentcore.memory.long-term.user-preference.strategy-id=prefs-456",
 					"agentcore.memory.long-term.summary.strategy-id=summary-789",
 					"agentcore.memory.long-term.episodic.strategy-id=episodic-abc")

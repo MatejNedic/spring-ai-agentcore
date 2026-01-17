@@ -44,6 +44,41 @@ A complete example demonstrating AWS Bedrock AgentCore Short-Term Memory integra
 
 ## Quick Start
 
+### Local Setup
+
+1. Setup your local AWS credentials / auth
+
+1. Create the AgentCore Memory:
+    ```bash
+    mvn spring-boot:test-run
+    ```
+1. Export the `AGENTCORE_MEMORY_ID` and `SUMMARY_STRATEGY_ID` env vars
+1. Start the Spring web application
+    ```bash
+    mvn spring-boot:run
+    ```
+1. Test the application:
+    ```bash
+    # Tell your name
+    curl -X POST http://localhost:8080/api/chat \
+      -H "Content-Type: application/json" \
+      -d '{"message": "My name is Andrei"}'
+    
+    # Ask for your name (memory recall)
+    curl -X POST http://localhost:8080/api/chat \
+      -H "Content-Type: application/json" \
+      -d '{"message": "What is my name?"}'
+    
+    # Get conversation history
+    curl http://localhost:8080/api/chat/history
+    
+    # Clear conversation
+    curl -X DELETE http://localhost:8080/api/chat/history
+    ```
+
+
+
+
 ### 1. Create Infrastructure
 
 ```bash

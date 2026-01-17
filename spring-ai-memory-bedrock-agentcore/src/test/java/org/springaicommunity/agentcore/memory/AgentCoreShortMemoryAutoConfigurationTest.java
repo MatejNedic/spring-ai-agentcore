@@ -71,9 +71,8 @@ class AgentCoreShortMemoryAutoConfigurationTest {
 					"agentcore.memory.default-session=my-session", "agentcore.memory.page-size=50",
 					"agentcore.memory.ignore-unknown-roles=true")
 			.run(context -> {
-				assertThat(context).hasSingleBean(AgentCoreShortMemoryRepositoryConfiguration.class);
-				AgentCoreShortMemoryRepositoryConfiguration config = context
-					.getBean(AgentCoreShortMemoryRepositoryConfiguration.class);
+				assertThat(context).hasSingleBean(AgentCoreMemoryProperties.class);
+				AgentCoreMemoryProperties config = context.getBean(AgentCoreMemoryProperties.class);
 				assertThat(config.memoryId()).isEqualTo("custom-memory");
 				assertThat(config.totalEventsLimit()).isEqualTo(500);
 				assertThat(config.defaultSession()).isEqualTo("my-session");

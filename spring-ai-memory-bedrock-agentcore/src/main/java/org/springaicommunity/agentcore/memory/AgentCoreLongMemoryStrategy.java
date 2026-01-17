@@ -9,8 +9,4 @@ public interface AgentCoreLongMemoryStrategy {
 
 	String strategyId();
 
-	default boolean isEnabled() {
-		return strategyId() != null && !strategyId().isEmpty();
-	}
-
 }

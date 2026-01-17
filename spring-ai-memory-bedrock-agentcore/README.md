@@ -68,7 +68,6 @@ agentcore:
 agentcore:
   memory:
     long-term:
-      enabled: true                              # Required: Enable LTM feature
       semantic:
         strategy-id: ${SEMANTIC_STRATEGY_ID}     # Enables strategy (omit to disable)
         top-k: 3                                 # Default: 3
