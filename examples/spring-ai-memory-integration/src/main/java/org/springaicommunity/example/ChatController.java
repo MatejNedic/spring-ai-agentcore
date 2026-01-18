@@ -14,13 +14,19 @@ public class ChatController {
 	private final ChatClient shortTermChatClient;
 	private final ChatClient longTermChatClient;
 	private final ChatMemory chatMemory;
+	private final AgentCoreLongMemoryRetriever retriever;
+	private final AgentCoreLongMemoryProperties config;
 
 	private static final String CONVERSATION_ID = "testActor:testSession";
 
 	public ChatController(
             ChatClient.Builder chatClientBuilder,
-            AgentCoreMemory agentCoreMemory, ChatMemory chatMemory) {
+            AgentCoreMemory agentCoreMemory, ChatMemory chatMemory,
+			AgentCoreLongMemoryRetriever retriever, AgentCoreLongMemoryProperties config,
+			AgentCoreShortMemoryRepository memoryRepository) {
         this.chatMemory = chatMemory;
+		this.retriever = retriever;
+		this.config = config;
 
         this.shortTermChatClient = chatClientBuilder
 			.defaultAdvisors(agentCoreMemory.shortMemoryAdvisor)
@@ -31,7 +37,7 @@ public class ChatController {
 				.build();
 
 		// NOTE! The memory events are removed on startup
-//		memoryRepository.deleteByConversationId(CONVERSATION_ID);
+		memoryRepository.deleteByConversationId(CONVERSATION_ID);
 	}
 
 	@PostMapping("/api/short")
@@ -67,7 +73,7 @@ public class ChatController {
 	}
 
 	@GetMapping("/api/memories")
-	public List<AgentCoreLongMemoryRetriever.MemoryRecord> getMemories(AgentCoreLongMemoryRetriever retriever, AgentCoreLongMemoryProperties config) {
+	public List<AgentCoreLongMemoryRetriever.MemoryRecord> getMemories() {
 		return retriever.listMemories(config.summary().strategyId(), "testActor");
 	}
 

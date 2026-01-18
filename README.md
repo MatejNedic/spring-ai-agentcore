@@ -10,6 +10,18 @@ A Spring Boot starter that enables existing Spring Boot applications to conform 
 - **Smart health checks**: Built-in `/ping` endpoint with Spring Boot Actuator integration
 - **Async task tracking**: Convenient methods for background task tracking
 - **Rate limiting**: Built-in Bucket4j throttling for invocations and ping endpoints
+- **AgentCore Memory integration**: Spring AI integration with AWS Bedrock AgentCore Memory service
+
+## Examples
+
+See the `examples/` directory for complete working examples:
+
+- **`simple-spring-boot-app/`** - Minimal AgentCore agent with async task tracking
+- **`spring-ai-sse-chat-client/`** - SSE streaming with Spring AI and Amazon Bedrock
+- **`spring-ai-simple-chat-client/`** - Traditional Spring AI integration (without AgentCore starter)
+- **`spring-ai-override-invocations/`** - Custom controller override using marker interfaces
+- **`spring-ai-memory-integration/`** - Spring AI ChatMemory integration with AWS Bedrock AgentCore Memory service
+- **`spring-ai-extended-chat-client/`** - Spring AI chat client with OAuth authentication and per-user memory isolation, deployable to AWS Bedrock AgentCore Runtime.
 
 ## Quick Start
 
@@ -247,21 +259,6 @@ When these marker interfaces are implemented, the corresponding auto-configured 
 
 See `examples/spring-ai-override-invocations/` for a complete working example.
 
-## Examples
-
-See the `examples/` directory for complete working examples:
-
-- **`simple-spring-boot-app/`** - Minimal AgentCore agent with async task tracking
-- **`spring-ai-sse-chat-client/`** - SSE streaming with Spring AI and Amazon Bedrock
-- **`spring-ai-simple-chat-client/`** - Traditional Spring AI integration (without AgentCore starter)
-- **`spring-ai-override-invocations/`** - Custom controller override using marker interfaces
-
-## Requirements
-
-- Java 17+
-- Spring Boot 3.x
-- Maven or Gradle
-
 ## AgentCore Memory
 
 The `spring-ai-memory-bedrock-agentcore` module provides Spring AI ChatMemory integration with AWS Bedrock AgentCore Memory service, supporting both Short-Term Memory (STM) and Long-Term Memory (LTM) with 4 consolidation strategies.
@@ -330,7 +327,6 @@ agentcore:
   memory:
     memory-id: ${AGENTCORE_MEMORY_MEMORY_ID}
     long-term:
-      enabled: true
       semantic:
         strategy-id: ${AGENTCORE_MEMORY_LONG_TERM_SEMANTIC_STRATEGY_ID}
       user-preference:
@@ -349,14 +345,10 @@ public class ChatService {
     private final ChatClient chatClient;
 
     public ChatService(ChatClient.Builder builder,
-                       ChatMemory chatMemory,
-                       List<AgentCoreLongMemoryAdvisor> ltmAdvisors) {
-
-        List<Advisor> advisors = new ArrayList<>(ltmAdvisors);
-        advisors.add(MessageChatMemoryAdvisor.builder(chatMemory).build());
+                       AgentCoreMemory agentCoreMemory) {
 
         this.chatClient = builder
-                .defaultAdvisors(advisors.toArray(new Advisor[0]))
+                .defaultAdvisors(agentCoreMemory.advisors)
                 .build();
     }
 
@@ -370,7 +362,7 @@ public class ChatService {
 }
 ```
 
-The `ChatMemory` and `AgentCoreLongMemoryAdvisor` beans are auto-configured when you set the required properties.
+The `AgentCoreMemory` bean is auto-configured when you set the required properties.
 
 For detailed configuration options and API reference, see [spring-ai-memory-bedrock-agentcore/README.md](spring-ai-memory-bedrock-agentcore/README.md).
 

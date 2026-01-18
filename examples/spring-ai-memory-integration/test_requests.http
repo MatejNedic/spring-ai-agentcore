@@ -1,4 +1,4 @@
-### Tell name
+### Tell name - STM
 POST http://localhost:8080/api/short
 Content-Type: application/json
 
@@ -6,13 +6,30 @@ Content-Type: application/json
   "message": "My name is Andrei"
 }
 
-### Ask name
+### Ask name - STM
 POST http://localhost:8080/api/short
 Content-Type: application/json
 
 {
   "message": "What is my name?"
 }
+
+### Tell name - LTM
+POST http://localhost:8080/api/long
+Content-Type: application/json
+
+{
+  "message": "My name is Andrei"
+}
+
+### Ask name - LTM
+POST http://localhost:8080/api/long
+Content-Type: application/json
+
+{
+  "message": "What is my name?"
+}
+
 
 ### Get history
 GET http://localhost:8080/api/history
