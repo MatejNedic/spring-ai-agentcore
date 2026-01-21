@@ -21,7 +21,7 @@
     <packaging>jar</packaging>
 
     <name>Spring AI Bedrock AgentCore Starter</name>
-    <description>Spring Boot starter for AWS Bedrock AgentCore runtime support</description>
+    <description>Spring Boot starter for Amazon Bedrock AgentCore runtime support</description>
 
     <organization>
         <name>Spring AI Community</name>

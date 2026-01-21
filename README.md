@@ -1,6 +1,6 @@
 # Spring AI Bedrock AgentCore
 
-A Spring Boot starter that enables existing Spring Boot applications to conform to the AWS Bedrock AgentCore Runtime contract with minimal configuration.
+A Spring Boot starter that enables existing Spring Boot applications to conform to the Amazon Bedrock AgentCore Runtime contract with minimal configuration.
 
 ## Features
 
@@ -10,7 +10,7 @@ A Spring Boot starter that enables existing Spring Boot applications to conform 
 - **Smart health checks**: Built-in `/ping` endpoint with Spring Boot Actuator integration
 - **Async task tracking**: Convenient methods for background task tracking
 - **Rate limiting**: Built-in Bucket4j throttling for invocations and ping endpoints
-- **AgentCore Memory integration**: Spring AI integration with AWS Bedrock AgentCore Memory service
+- **AgentCore Memory integration**: Spring AI integration with Amazon Bedrock AgentCore Memory service
 
 ## Examples
 
@@ -20,8 +20,8 @@ See the `examples/` directory for complete working examples:
 - **`spring-ai-sse-chat-client/`** - SSE streaming with Spring AI and Amazon Bedrock
 - **`spring-ai-simple-chat-client/`** - Traditional Spring AI integration (without AgentCore starter)
 - **`spring-ai-override-invocations/`** - Custom controller override using marker interfaces
-- **`spring-ai-memory-integration/`** - Spring AI ChatMemory integration with AWS Bedrock AgentCore Memory service
-- **`spring-ai-extended-chat-client/`** - Spring AI chat client with OAuth authentication and per-user memory isolation, deployable to AWS Bedrock AgentCore Runtime.
+- **`spring-ai-memory-integration/`** - Spring AI ChatMemory integration with Amazon Bedrock AgentCore Memory service
+- **`spring-ai-extended-chat-client/`** - Spring AI chat client with OAuth authentication and per-user memory isolation, deployable to Amazon Bedrock AgentCore Runtime.
 
 ## Quick Start
 
@@ -136,7 +136,7 @@ The `/ping` endpoint provides intelligent health monitoring:
 
 ### Background Task Tracking
 
-AWS Bedrock AgentCore Runtime monitors agent health and may shut down agents that appear idle. When your agent starts long-running background tasks (like file processing, data analysis, or calling other long-running agents), the runtime needs to know the agent is still actively working to avoid premature termination.
+Amazon Bedrock AgentCore Runtime monitors agent health and may shut down agents that appear idle. When your agent starts long-running background tasks (like file processing, data analysis, or calling other long-running agents), the runtime needs to know the agent is still actively working to avoid premature termination.
 
 The starter includes `AgentCoreTaskTracker` to communicate this state to the runtime:
 
@@ -261,7 +261,7 @@ See `examples/spring-ai-override-invocations/` for a complete working example.
 
 ## AgentCore Memory
 
-The `spring-ai-memory-bedrock-agentcore` module provides Spring AI ChatMemory integration with AWS Bedrock AgentCore Memory service, supporting both Short-Term Memory (STM) and Long-Term Memory (LTM) with 4 consolidation strategies.
+The `spring-ai-memory-bedrock-agentcore` module provides Spring AI ChatMemory integration with Amazon Bedrock AgentCore Memory service, supporting both Short-Term Memory (STM) and Long-Term Memory (LTM) with 4 consolidation strategies.
 
 ### Add Dependency
 
