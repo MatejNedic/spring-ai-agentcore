@@ -18,10 +18,10 @@ spring-ai-bedrock-agentcore/
 
 ### Key Components
 
-| Module | Purpose | Entry Point |
-|--------|---------|-------------|
-| `starter` | AgentCore Runtime contract | `AgentCoreAutoConfiguration.java` |
-| `memory` | Spring AI ChatMemory integration | `AgentCoreShortTermMemoryRepositoryAutoConfiguration.java`, `AgentCoreLongMemoryAutoConfiguration.java` |
+| Module | Purpose | Entry Point                                                                                                 |
+|--------|---------|-------------------------------------------------------------------------------------------------------------|
+| `starter` | AgentCore Runtime contract | `AgentCoreAutoConfiguration.java`                                                                           |
+| `memory` | Spring AI ChatMemory integration | `AgentCoreShortTermMemoryRepositoryAutoConfiguration.java`, `AgentCoreLongTermMemoryAutoConfiguration.java` |
 
 ### Memory Module Classes
 
