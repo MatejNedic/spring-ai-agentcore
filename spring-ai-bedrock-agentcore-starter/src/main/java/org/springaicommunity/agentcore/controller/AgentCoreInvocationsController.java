@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
 import org.springaicommunity.agentcore.service.AgentCoreMethodInvoker;
-import org.springaicommunity.agentcore.service.SseNormalizer;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -36,13 +35,10 @@ public class AgentCoreInvocationsController implements AgentCoreInvocationsHandl
 
 	private final AgentCoreMethodInvoker invoker;
 
-	private final SseNormalizer sseNormalizer;
-
 	private final Logger logger = LoggerFactory.getLogger(AgentCoreInvocationsController.class);
 
-	public AgentCoreInvocationsController(AgentCoreMethodInvoker invoker, SseNormalizer sseNormalizer) {
+	public AgentCoreInvocationsController(AgentCoreMethodInvoker invoker) {
 		this.invoker = invoker;
-		this.sseNormalizer = sseNormalizer;
 	}
 
 	@PostMapping(value = "/invocations", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -63,8 +59,7 @@ public class AgentCoreInvocationsController implements AgentCoreInvocationsHandl
 
 	private Object handleInvocation(Object request, HttpHeaders headers) throws Exception {
 		try {
-			Object result = invoker.invokeAgentMethod(request, headers);
-			return sseNormalizer.normalize(result);
+			return invoker.invokeAgentMethod(request, headers);
 		}
 		catch (AgentCoreInvocationException e) {
 			logger.error("Error trying to invoke AgentCoreInvocation method: " + e.getMessage(), e);
