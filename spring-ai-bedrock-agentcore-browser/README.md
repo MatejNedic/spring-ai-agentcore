@@ -45,9 +45,11 @@ public class ChatService {
     public Flux<String> chat(String prompt, String sessionId) {
         return chatClient.prompt()
             .user(prompt)
-            .toolContext(Map.of(BrowserScreenshotStore.SESSION_ID_KEY, sessionId))
-            .stream().content()
-            .concatWith(Flux.defer(() -> appendScreenshots(sessionId)));
+            .stream()
+            .content()
+            .concatWith(Flux.defer(() -> appendScreenshots(sessionId)))
+            // Store sessionId in Reactor context for tools
+            .contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId));
     }
 
     private Flux<String> appendScreenshots(String sessionId) {
@@ -61,6 +63,23 @@ public class ChatService {
               .append(s.toDataUrl()).append(")");
         }
         return Flux.just(sb.toString());
+    }
+}
+```
+
+## Session ID Handling
+
+Session ID is passed via Reactor context and read using Spring AI's `ToolCallReactiveContextHolder`. This is required because tool execution happens on `Schedulers.boundedElastic()` thread pool, not the HTTP request thread.
+
+```java
+// BrowserTools reads session ID from Reactor context
+public class BrowserTools {
+    public static final String SESSION_ID_CONTEXT_KEY = "sessionId";
+
+    public String takeScreenshot(String url) {
+        ContextView ctx = ToolCallReactiveContextHolder.getContext();
+        String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, DEFAULT_SESSION_ID);
+        // ... store screenshot by sessionId
     }
 }
 ```

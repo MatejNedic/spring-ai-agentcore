@@ -13,7 +13,7 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 │                       BrowserTools                              │
 ├─────────────────────────────────────────────────────────────────┤
 │  browseUrl(url) → String                                        │
-│  takeScreenshot(url, ToolContext) → String (metadata)           │
+│  takeScreenshot(url) → String (metadata)                        │
 │  clickElement(url, selector) → String                           │
 │  fillForm(url, selector, value) → String                        │
 │  evaluateScript(url, script) → String                           │
@@ -46,7 +46,7 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 | `AgentCoreBrowserAutoConfiguration` | Spring Boot auto-config with `ToolCallbackProvider` |
 | `AgentCoreBrowserClient` | Low-level SDK wrapper with SigV4 WebSocket signing |
 | `AgentCoreBrowserConfiguration` | Config properties with default constants |
-| `BrowserTools` | Tool implementation logic (no annotations) |
+| `BrowserTools` | Tool implementation with Reactor context session handling |
 | `BrowserScreenshotStore` | Session-scoped screenshot storage with Caffeine cache |
 | `BrowserScreenshot` | Record for screenshot data with defensive copy |
 | `BrowserOperationException` | Exception for browser failures |
@@ -62,15 +62,31 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 6. **Lazy Playwright init** - Playwright instance created on first use, reused across calls
 7. **Thread-safe screenshot store** - Uses `CopyOnWriteArrayList` for concurrent access
 8. **Consistent error handling** - All tools return "Error: ..." strings on failure
+9. **Reactor context for session ID** - Session ID passed via `ToolCallReactiveContextHolder`, not `ToolContext`, to avoid leaking metadata to MCP tools
+
+## Session ID Handling
+
+Tool execution happens on `Schedulers.boundedElastic()` thread pool, not the HTTP request thread. `@RequestScope` beans throw `ScopeNotActiveException` because no HTTP request context exists on those threads.
+
+Spring AI's `ToolCallReactiveContextHolder` bridges Reactor context to ThreadLocal:
+
+```java
+// ChatService stores sessionId in Reactor context
+.contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId))
+
+// BrowserTools reads from ToolCallReactiveContextHolder
+ContextView ctx = ToolCallReactiveContextHolder.getContext();
+String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, DEFAULT_SESSION_ID);
+```
 
 ## Request Flow
 
 ```
 1. User: "Take a screenshot of example.com"
-2. ChatService passes sessionId via toolContext
+2. ChatService stores sessionId in Reactor context via .contextWrite()
 3. LLM calls takeScreenshot tool
 4. BrowserTools.takeScreenshot():
-   a. Extract sessionId from toolContext
+   a. Read sessionId from ToolCallReactiveContextHolder
    b. client.screenshotBytes(url) → PNG bytes
    c. screenshotStore.store(sessionId, screenshot)
    d. Return metadata to LLM: "Screenshot captured: 16752 bytes, 1456x819"
@@ -107,6 +123,36 @@ mvn spring-javaformat:apply -pl spring-ai-bedrock-agentcore-browser
 # Integration test (requires AWS credentials)
 AGENTCORE_IT=true mvn verify -pl spring-ai-bedrock-agentcore-browser
 ```
+
+## Integration Tests
+
+**BrowserToolsIT (16 tests):**
+
+| Test | Coverage |
+|------|----------|
+| `shouldBrowseUrlAndReturnContent` | browseUrl() |
+| `shouldBrowseUrlReturnErrorForInvalidUrl` | browseUrl() error |
+| `shouldTakeScreenshotAndStoreBySessionId` | takeScreenshot() + store |
+| `shouldTakeScreenshotUseDefaultSessionWhenNull` | takeScreenshot() + null session |
+| `shouldTakeScreenshotReturnErrorOnFailure` | takeScreenshot() error |
+| `shouldRetrieveScreenshotOnlyFromOwnSession` | session isolation |
+| `shouldClearScreenshotsAfterRetrieve` | retrieve() clears |
+| `shouldHasScreenshotsReturnCorrectly` | hasScreenshots() |
+| `shouldScreenshotToDataUrlReturnValidFormat` | BrowserScreenshot.toDataUrl() |
+| `shouldIsolateScreenshotsBetweenParallelSessions` | Parallel session isolation |
+| `shouldClickElement` | clickElement() |
+| `shouldClickElementReturnErrorOnFailure` | clickElement() error |
+| `shouldFillForm` | fillForm() |
+| `shouldFillFormReturnErrorOnFailure` | fillForm() error |
+| `shouldEvaluateScript` | evaluateScript() |
+| `shouldEvaluateScriptReturnErrorOnFailure` | evaluateScript() error |
+
+**BrowserChatFlowIT (2 tests):**
+
+| Test | Coverage |
+|------|----------|
+| `shouldPropagateSessionIdThroughChatClientFlow` | Session ID flows from ChatClient to tool |
+| `shouldIsolateSessionsBetweenConcurrentRequests` | Parallel requests maintain session isolation |
 
 ## Not Implemented
 

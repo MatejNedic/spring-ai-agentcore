@@ -101,9 +101,7 @@ public class AgentCoreBrowserAutoConfiguration {
 			.build();
 
 		ToolCallback screenshotCallback = FunctionToolCallback
-			.builder("takeScreenshot",
-					(ScreenshotRequest request, org.springframework.ai.chat.model.ToolContext ctx) -> tools
-						.takeScreenshot(request.url(), ctx))
+			.builder("takeScreenshot", (ScreenshotRequest request) -> tools.takeScreenshot(request.url()))
 			.description(screenshotDesc)
 			.inputType(ScreenshotRequest.class)
 			.build();

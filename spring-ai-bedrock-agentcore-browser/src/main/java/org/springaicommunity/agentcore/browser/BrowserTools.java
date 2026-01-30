@@ -18,7 +18,8 @@ package org.springaicommunity.agentcore.browser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
+import reactor.util.context.ContextView;
 
 /**
  * Browser tool implementation for browsing web pages and extracting content.
@@ -31,6 +32,12 @@ import org.springframework.ai.chat.model.ToolContext;
 public class BrowserTools {
 
 	private static final Logger logger = LoggerFactory.getLogger(BrowserTools.class);
+
+	/**
+	 * Reactor context key for session ID. Callers should store session ID under this key
+	 * via `.contextWrite(ctx -> ctx.put(SESSION_ID_CONTEXT_KEY, sessionId))`.
+	 */
+	public static final String SESSION_ID_CONTEXT_KEY = "sessionId";
 
 	public static final String BROWSE_URL_DESCRIPTION = """
 			Browse a web page and extract its text content.
@@ -89,16 +96,21 @@ public class BrowserTools {
 	/**
 	 * Take a screenshot of a web page.
 	 * @param url the URL to navigate to
-	 * @param toolContext context containing session ID for multi-user support
 	 * @return metadata about the captured screenshot
 	 */
-	public String takeScreenshot(String url, ToolContext toolContext) {
+	public String takeScreenshot(String url) {
 		logger.debug("takeScreenshot: {}", url);
 
 		try {
 			byte[] screenshotBytes = client.screenshotBytes(url);
 
-			String sessionId = extractSessionId(toolContext);
+			// Get session ID from Reactor context (available via
+			// ToolCallReactiveContextHolder)
+			ContextView ctx = ToolCallReactiveContextHolder.getContext();
+			String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, BrowserScreenshotStore.DEFAULT_SESSION_ID);
+			if (sessionId == null || sessionId.isBlank()) {
+				sessionId = BrowserScreenshotStore.DEFAULT_SESSION_ID;
+			}
 
 			// Store screenshot
 			BrowserScreenshot screenshot = new BrowserScreenshot(screenshotBytes, url, config.viewportWidth(),
@@ -114,21 +126,6 @@ public class BrowserTools {
 			logger.error("Screenshot failed: {}", e.getMessage());
 			return "Error: " + e.getMessage();
 		}
-	}
-
-	/**
-	 * Extract session ID from tool context.
-	 * @param toolContext the tool context
-	 * @return session ID or default if not present
-	 */
-	private String extractSessionId(ToolContext toolContext) {
-		if (toolContext != null && toolContext.getContext() != null) {
-			Object sessionIdObj = toolContext.getContext().get(BrowserScreenshotStore.SESSION_ID_KEY);
-			if (sessionIdObj instanceof String s && !s.isBlank()) {
-				return s;
-			}
-		}
-		return BrowserScreenshotStore.DEFAULT_SESSION_ID;
 	}
 
 	/**
