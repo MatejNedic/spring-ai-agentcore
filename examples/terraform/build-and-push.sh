@@ -7,7 +7,7 @@ AWS_REGION=$(grep 'region' terraform.tfvars | cut -d'"' -f2)
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 # Available examples
-VALID_APPS=("simple-spring-boot-app" "spring-ai-sse-chat-client" "spring-ai-simple-chat-client")
+VALID_APPS=("simple-spring-boot-app" "spring-ai-sse-chat-client" "spring-ai-simple-chat-client" "spring-ai-extended-chat-client" "spring-ai-override-invocations")
 
 # Interactive selection if no argument provided
 if [ $# -eq 0 ]; then
@@ -46,6 +46,39 @@ else
     exit 1
 fi
 
+# Detect CPU architecture
+HOST_ARCH=$(uname -m)
+TARGET_ARCH="arm64"
+
+# Normalize host architecture for comparison
+if [ "$HOST_ARCH" = "x86_64" ]; then
+    HOST_ARCH_NORMALIZED="amd64"
+elif [ "$HOST_ARCH" = "aarch64" ]; then
+    HOST_ARCH_NORMALIZED="arm64"
+else
+    HOST_ARCH_NORMALIZED="$HOST_ARCH"
+fi
+
+# Set up cross-platform build if needed
+if [ "$HOST_ARCH_NORMALIZED" != "$TARGET_ARCH" ]; then
+    echo "⚠️  Cross-platform build detected (${HOST_ARCH_NORMALIZED} → ${TARGET_ARCH})"
+    if ! $RUNTIME buildx inspect --bootstrap 2>/dev/null | grep -q "linux/${TARGET_ARCH}"; then
+        echo "📦 Installing QEMU for cross-platform builds..."
+        $RUNTIME run --privileged --rm tonistiigi/binfmt --install all
+        if [ $? -ne 0 ]; then
+            echo "❌ Error: Failed to install QEMU"
+            echo "   You can install it manually with:"
+            echo "   $RUNTIME run --privileged --rm tonistiigi/binfmt --install all"
+            exit 1
+        fi
+        echo "✅ QEMU installed successfully"
+    else
+        echo "✅ QEMU already installed and configured"
+    fi
+else
+    echo "✅ Native ${TARGET_ARCH} build - no emulation needed"
+fi
+
 # ECR repository name (lowercase)
 ECR_REPO_NAME=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')
 ECR_URL="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME"
@@ -63,7 +96,7 @@ fi
 cd "../$EXAMPLE_APP" && mvn clean package -DskipTests -q && cd ../terraform
 
 echo "🐳 Building container image..."
-$RUNTIME build -t temp-image "../$EXAMPLE_APP"
+$RUNTIME build --platform linux/arm64 -t temp-image "../$EXAMPLE_APP"
 
 echo "🚀 Pushing to ECR..."
 aws ecr get-login-password --region "$AWS_REGION" | \
