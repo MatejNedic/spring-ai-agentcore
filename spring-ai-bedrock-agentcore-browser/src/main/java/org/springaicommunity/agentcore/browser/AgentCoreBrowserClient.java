@@ -27,7 +27,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -50,7 +49,7 @@ import software.amazon.awssdk.services.bedrockagentcore.model.ViewPort;
  *
  * @author Yuriy Bezsonov
  */
-public class AgentCoreBrowserClient {
+public class AgentCoreBrowserClient implements BrowserClient {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreBrowserClient.class);
 
@@ -64,15 +63,16 @@ public class AgentCoreBrowserClient {
 
 	private final AwsV4HttpSigner signer;
 
-	private volatile Playwright playwright;
+	private final Playwright playwright;
 
 	public AgentCoreBrowserClient(BedrockAgentCoreClient client, AgentCoreBrowserConfiguration config,
-			AwsCredentialsProvider credentialsProvider) {
+			AwsCredentialsProvider credentialsProvider, Playwright playwright) {
 		this.client = client;
 		this.config = config;
 		this.region = client.serviceClientConfiguration().region();
 		this.credentialsProvider = credentialsProvider;
 		this.signer = AwsV4HttpSigner.create();
+		this.playwright = playwright;
 		logger.info("AgentCoreBrowserClient initialized: timeout={}s, viewport={}x{}, maxContent={}",
 				config.sessionTimeoutSeconds(), config.viewportWidth(), config.viewportHeight(),
 				config.maxContentLength());
@@ -90,12 +90,7 @@ public class AgentCoreBrowserClient {
 
 			logger.info("Page loaded: {} ({} chars)", title, textContent.length());
 
-			int maxLength = config.maxContentLength();
-			if (textContent.length() > maxLength) {
-				textContent = textContent.substring(0, maxLength) + "\n... [truncated]";
-			}
-
-			return String.format("Title: %s\n\nContent:\n%s", title, textContent);
+			return PageContentFormatter.format(title, textContent, config.maxContentLength());
 		});
 	}
 
@@ -204,11 +199,10 @@ public class AgentCoreBrowserClient {
 	}
 
 	private <T> T executeOnPage(WsConnection wsConn, String targetUrl, Function<Page, T> operation) {
-		Playwright pw = getPlaywright();
 		Browser browser = null;
 
 		try {
-			BrowserType chromium = pw.chromium();
+			BrowserType chromium = playwright.chromium();
 			browser = chromium.connectOverCDP(wsConn.url(),
 					new BrowserType.ConnectOverCDPOptions().setHeaders(wsConn.headers()));
 
@@ -277,20 +271,6 @@ public class AgentCoreBrowserClient {
 		return new WsConnection(wsEndpoint, headers);
 	}
 
-	private Playwright getPlaywright() {
-		Playwright pw = playwright;
-		if (pw == null) {
-			synchronized (this) {
-				pw = playwright;
-				if (pw == null) {
-					pw = Playwright.create();
-					playwright = pw;
-				}
-			}
-		}
-		return pw;
-	}
-
 	private void stopSession(String sessionId) {
 		try {
 			logger.debug("Stopping browser session: {}", sessionId);
@@ -302,14 +282,6 @@ public class AgentCoreBrowserClient {
 		}
 		catch (Exception e) {
 			logger.warn("Failed to stop browser session {}: {}", sessionId, e.getMessage());
-		}
-	}
-
-	@PreDestroy
-	public synchronized void close() {
-		if (playwright != null) {
-			playwright.close();
-			playwright = null;
 		}
 	}
 

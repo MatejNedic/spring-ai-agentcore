@@ -21,6 +21,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Configuration properties for AgentCore Browser.
  *
+ * @param mode browser mode: "agentcore" (default) for AgentCore Browser service, "local"
+ * for local Chromium
  * @param sessionTimeoutSeconds session timeout in seconds (default 900)
  * @param browserIdentifier identifier for the browser service (default "aws.browser.v1")
  * @param viewportWidth browser viewport width in pixels (default 1456)
@@ -35,10 +37,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Yuriy Bezsonov
  */
 @ConfigurationProperties(prefix = "agentcore.browser")
-public record AgentCoreBrowserConfiguration(Integer sessionTimeoutSeconds, String browserIdentifier,
+public record AgentCoreBrowserConfiguration(String mode, Integer sessionTimeoutSeconds, String browserIdentifier,
 		Integer viewportWidth, Integer viewportHeight, Integer maxContentLength, Integer screenshotTtlSeconds,
 		String browseUrlDescription, String screenshotDescription, String clickDescription, String fillDescription,
 		String evaluateDescription) {
+
+	/** Default browser mode. */
+	public static final String DEFAULT_MODE = "agentcore";
+
+	/** Local browser mode. */
+	public static final String MODE_LOCAL = "local";
 
 	/** Default session timeout in seconds. */
 	public static final int DEFAULT_SESSION_TIMEOUT_SECONDS = 900;
@@ -59,6 +67,9 @@ public record AgentCoreBrowserConfiguration(Integer sessionTimeoutSeconds, Strin
 	public static final int DEFAULT_SCREENSHOT_TTL_SECONDS = 300;
 
 	public AgentCoreBrowserConfiguration {
+		if (mode == null || mode.isBlank()) {
+			mode = DEFAULT_MODE;
+		}
 		if (sessionTimeoutSeconds == null || sessionTimeoutSeconds <= 0) {
 			sessionTimeoutSeconds = DEFAULT_SESSION_TIMEOUT_SECONDS;
 		}

@@ -63,13 +63,13 @@ public class BrowserTools {
 			Execute JavaScript on a web page and return the result.
 			""";
 
-	private final AgentCoreBrowserClient client;
+	private final BrowserClient client;
 
 	private final BrowserScreenshotStore screenshotStore;
 
 	private final AgentCoreBrowserConfiguration config;
 
-	public BrowserTools(AgentCoreBrowserClient client, BrowserScreenshotStore screenshotStore,
+	public BrowserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
 			AgentCoreBrowserConfiguration config) {
 		this.client = client;
 		this.screenshotStore = screenshotStore;

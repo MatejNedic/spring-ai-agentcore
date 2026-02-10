@@ -25,8 +25,10 @@ import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
@@ -35,7 +37,12 @@ import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
  * Auto-configuration for AgentCore Browser integration.
  *
  * <p>
- * Creates beans for browser session management and Spring AI tool integration.
+ * Creates beans for browser session management and Spring AI tool integration. Supports
+ * two modes via {@code agentcore.browser.mode}:
+ * <ul>
+ * <li>{@code agentcore} (default) — uses AgentCore Browser service</li>
+ * <li>{@code local} — uses a locally launched Chromium browser</li>
+ * </ul>
  *
  * @author Yuriy Bezsonov
  */
@@ -46,8 +53,11 @@ public class AgentCoreBrowserAutoConfiguration {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreBrowserAutoConfiguration.class);
 
+	// ========== AgentCore mode beans ==========
+
 	@Bean
 	@ConditionalOnMissingBean
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "agentcore", matchIfMissing = true)
 	BedrockAgentCoreClient bedrockAgentCoreClient() {
 		logger.debug("Creating BedrockAgentCoreClient bean");
 		return BedrockAgentCoreClient.create();
@@ -55,18 +65,49 @@ public class AgentCoreBrowserAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "agentcore", matchIfMissing = true)
 	AwsCredentialsProvider awsCredentialsProvider() {
 		logger.debug("Creating AwsCredentialsProvider bean");
 		return DefaultCredentialsProvider.builder().build();
 	}
 
-	@Bean
+	@Lazy
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
-	AgentCoreBrowserClient agentCoreBrowserClient(BedrockAgentCoreClient client, AgentCoreBrowserConfiguration config,
-			AwsCredentialsProvider credentialsProvider) {
-		logger.debug("Creating AgentCoreBrowserClient bean");
-		return new AgentCoreBrowserClient(client, config, credentialsProvider);
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "agentcore", matchIfMissing = true)
+	Playwright agentCorePlaywright() {
+		logger.debug("Creating Playwright bean for AgentCore mode (lazy)");
+		return Playwright.create();
 	}
+
+	@Bean
+	@ConditionalOnMissingBean(BrowserClient.class)
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "agentcore", matchIfMissing = true)
+	AgentCoreBrowserClient agentCoreBrowserClient(BedrockAgentCoreClient client, AgentCoreBrowserConfiguration config,
+			AwsCredentialsProvider credentialsProvider, Playwright agentCorePlaywright) {
+		logger.debug("Creating AgentCoreBrowserClient bean (agentcore mode)");
+		return new AgentCoreBrowserClient(client, config, credentialsProvider, agentCorePlaywright);
+	}
+
+	// ========== Local mode beans ==========
+
+	@Bean(destroyMethod = "close")
+	@ConditionalOnMissingBean
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "local")
+	Playwright localPlaywright() {
+		logger.debug("Creating Playwright bean for local mode");
+		return Playwright.create();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(BrowserClient.class)
+	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "local")
+	LocalBrowserClient localBrowserClient(Playwright localPlaywright, AgentCoreBrowserConfiguration config) {
+		logger.debug("Creating LocalBrowserClient bean (local mode)");
+		return new LocalBrowserClient(localPlaywright, config);
+	}
+
+	// ========== Shared beans ==========
 
 	@Bean
 	@ConditionalOnMissingBean
@@ -77,7 +118,7 @@ public class AgentCoreBrowserAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	BrowserTools browserTools(AgentCoreBrowserClient client, BrowserScreenshotStore screenshotStore,
+	BrowserTools browserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
 			AgentCoreBrowserConfiguration config) {
 		logger.debug("Creating BrowserTools bean");
 		return new BrowserTools(client, screenshotStore, config);

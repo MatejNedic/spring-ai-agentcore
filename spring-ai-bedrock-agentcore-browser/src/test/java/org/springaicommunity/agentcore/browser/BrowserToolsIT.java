@@ -32,12 +32,8 @@ import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import reactor.util.context.Context;
-
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 /**
  * Integration tests for BrowserTools.
@@ -298,30 +294,9 @@ class BrowserToolsIT {
 		assertThat(sharedStore.hasScreenshots("concurrent-session-2")).isFalse();
 	}
 
-	@SpringBootApplication(
-			exclude = { org.springaicommunity.agentcore.browser.AgentCoreBrowserAutoConfiguration.class })
+	@SpringBootApplication
+	@Import(AgentCoreBrowserTestConfiguration.class)
 	static class TestApp {
-
-		@Bean
-		BedrockAgentCoreClient bedrockAgentCoreClient() {
-			return BedrockAgentCoreClient.create();
-		}
-
-		@Bean
-		AwsCredentialsProvider awsCredentialsProvider() {
-			return DefaultCredentialsProvider.builder().build();
-		}
-
-		@Bean
-		AgentCoreBrowserConfiguration browserConfiguration() {
-			return new AgentCoreBrowserConfiguration(null, null, null, null, null, null, null, null, null, null, null);
-		}
-
-		@Bean
-		AgentCoreBrowserClient agentCoreBrowserClient(BedrockAgentCoreClient client,
-				AgentCoreBrowserConfiguration config, AwsCredentialsProvider credentialsProvider) {
-			return new AgentCoreBrowserClient(client, config, credentialsProvider);
-		}
 
 	}
 

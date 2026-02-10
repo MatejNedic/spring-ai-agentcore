@@ -18,19 +18,19 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 │  fillForm(url, selector, value) → String                        │
 │  evaluateScript(url, script) → String                           │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ uses
+                            │ uses BrowserClient interface
                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   AgentCoreBrowserClient                        │
-├─────────────────────────────────────────────────────────────────┤
-│  browseAndExtract(url) → String                                 │
-│  screenshotBytes(url) → byte[]                                  │
-│  click(url, selector) → String                                  │
-│  fill(url, selector, value) → String                            │
-│  evaluate(url, script) → String                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ uses
-                            ▼
+              ┌─────────────┴─────────────┐
+              │                           │
+┌─────────────┴───────────┐ ┌─────────────┴───────────┐
+│  AgentCoreBrowserClient │ │   LocalBrowserClient    │
+│  (mode=agentcore)       │ │   (mode=local)          │
+├─────────────────────────┤ ├─────────────────────────┤
+│  SigV4 + CDP over WS   │ │  Local Chromium launch  │
+│  AgentCore sessions     │ │  No AWS dependencies    │
+└───────────┬─────────────┘ └─────────────────────────┘
+            │ uses
+            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                 BedrockAgentCoreClient (SDK)                    │
 ├─────────────────────────────────────────────────────────────────┤
@@ -44,11 +44,14 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 | Class | Purpose |
 |-------|---------|
 | `AgentCoreBrowserAutoConfiguration` | Spring Boot auto-config with `ToolCallbackProvider` |
-| `AgentCoreBrowserClient` | Low-level SDK wrapper with SigV4 WebSocket signing |
+| `BrowserClient` | Interface for browser operations (agentcore or local) |
+| `AgentCoreBrowserClient` | Remote implementation with SigV4 WebSocket signing |
+| `LocalBrowserClient` | Local implementation using Playwright Chromium launch |
 | `AgentCoreBrowserConfiguration` | Config properties with default constants |
 | `BrowserTools` | Tool implementation with Reactor context session handling |
 | `BrowserScreenshotStore` | Session-scoped screenshot storage with Caffeine cache |
 | `BrowserScreenshot` | Record for screenshot data with defensive copy |
+| `PageContentFormatter` | Package-private utility for formatting extracted page content |
 | `BrowserOperationException` | Exception for browser failures |
 | `BrowseUrlRequest`, `ScreenshotRequest`, etc. | Input schema records for tools |
 
@@ -59,10 +62,13 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 3. **SigV4 WebSocket signing** - AWS authentication for secure WebSocket connection
 4. **Ephemeral sessions** - Each tool call creates/destroys a session
 5. **Screenshot store** - Screenshots stored in Caffeine cache, appended to response after stream
-6. **Lazy Playwright init** - Playwright instance created on first use, reused across calls
-7. **Thread-safe screenshot store** - Uses `CopyOnWriteArrayList` for concurrent access
-8. **Consistent error handling** - All tools return "Error: ..." strings on failure
-9. **Reactor context for session ID** - Session ID passed via `ToolCallReactiveContextHolder`, not `ToolContext`, to avoid leaking metadata to MCP tools
+6. **Lazy Playwright init** - Playwright managed as Spring `@Bean` with `destroyMethod="close"`; lazy in agentcore mode, eager in local mode
+7. **BrowserClient interface** - Abstracts browser operations; `AgentCoreBrowserClient` for remote, `LocalBrowserClient` for local dev
+8. **Mode-based auto-configuration** - `@ConditionalOnProperty` switches between agentcore and local implementations
+9. **Thread-safe screenshot store** - Uses `CopyOnWriteArrayList` for concurrent access
+10. **Consistent error handling** - All tools return "Error: ..." strings on failure
+11. **Reactor context for session ID** - Session ID passed via `ToolCallReactiveContextHolder`, not `ToolContext`, to avoid leaking metadata to MCP tools
+12. **Shared content formatting** - `PageContentFormatter` extracts title + body text + truncation logic, shared by both `BrowserClient` implementations
 
 ## Session ID Handling
 
@@ -98,6 +104,7 @@ String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, DEFAULT_SESSION_ID);
 ## Configuration
 
 ```properties
+agentcore.browser.mode=agentcore                # "agentcore" (default) or "local"
 agentcore.browser.session-timeout-seconds=900
 agentcore.browser.browser-identifier=aws.browser.v1
 agentcore.browser.viewport-width=1456
@@ -120,13 +127,16 @@ mvn compile -pl spring-ai-bedrock-agentcore-browser
 # Format (required before commit)
 mvn spring-javaformat:apply -pl spring-ai-bedrock-agentcore-browser
 
-# Integration test (requires AWS credentials)
+# Local browser tests (no AWS credentials needed)
+mvn test -pl spring-ai-bedrock-agentcore-browser
+
+# Full integration test (requires AWS credentials)
 AGENTCORE_IT=true mvn verify -pl spring-ai-bedrock-agentcore-browser
 ```
 
 ## Integration Tests
 
-**BrowserToolsIT (16 tests):**
+**BrowserToolsIT (16 tests, requires AGENTCORE_IT=true):**
 
 | Test | Coverage |
 |------|----------|
@@ -147,12 +157,32 @@ AGENTCORE_IT=true mvn verify -pl spring-ai-bedrock-agentcore-browser
 | `shouldEvaluateScript` | evaluateScript() |
 | `shouldEvaluateScriptReturnErrorOnFailure` | evaluateScript() error |
 
-**BrowserChatFlowIT (2 tests):**
+**BrowserChatFlowIT (2 tests, requires AGENTCORE_IT=true):**
 
 | Test | Coverage |
 |------|----------|
 | `shouldPropagateSessionIdThroughChatClientFlow` | Session ID flows from ChatClient to tool |
 | `shouldIsolateSessionsBetweenConcurrentRequests` | Parallel requests maintain session isolation |
+
+**LocalBrowserClientTest (8 tests, no AWS credentials needed):**
+
+| Test | Coverage |
+|------|----------|
+| `shouldBrowseAndExtract` | browseAndExtract() with local Chromium |
+| `shouldTakeScreenshot` | screenshotBytes() + PNG validation |
+| `shouldClickElement` | click() |
+| `shouldFillFormField` | fill() |
+| `shouldEvaluateScript` | evaluate() |
+| `shouldThrowForInvalidUrl` | BrowserOperationException on failure |
+| `shouldTruncateContent` | maxContentLength truncation |
+| `shouldImplementBrowserClientInterface` | Interface contract |
+
+**LocalBrowserToolsIT (2 tests, no AWS credentials needed):**
+
+| Test | Coverage |
+|------|----------|
+| `shouldWireLocalBrowserClient` | Spring wiring with mode=local |
+| `shouldStoreScreenshotUnderSessionId` | Screenshot storage via BrowserTools |
 
 ## Not Implemented
 

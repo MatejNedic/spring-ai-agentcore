@@ -2,6 +2,10 @@
 
 Spring AI integration with Amazon Bedrock AgentCore Browser. Headless browser automation for web page navigation, content extraction, screenshots, and page interaction using Playwright over CDP.
 
+Supports two modes:
+- **agentcore** (default) — uses AgentCore Browser managed service
+- **local** — uses a locally launched Chromium browser for development and testing
+
 ## Features
 
 - Browse web pages and extract text content
@@ -98,6 +102,7 @@ public class BrowserTools {
 
 ```properties
 # All optional - defaults shown
+agentcore.browser.mode=agentcore          # or "local" for local Chromium
 agentcore.browser.session-timeout-seconds=900
 agentcore.browser.browser-identifier=aws.browser.v1
 agentcore.browser.viewport-width=1456
@@ -113,10 +118,28 @@ agentcore.browser.fill-description=...
 agentcore.browser.evaluate-description=...
 ```
 
+## Local Development
+
+For local development without AWS credentials, use local mode:
+
+```properties
+agentcore.browser.mode=local
+```
+
+This launches a headless Chromium browser locally via Playwright. Same tools, same behavior — just no AgentCore service dependency. Useful for development and testing.
+
+## Example Application
+
+See [`examples/spring-ai-browser`](../examples/spring-ai-browser) for a minimal standalone app that browses a URL, extracts content, takes a screenshot, and saves it to a local folder. Defaults to local mode.
+
 ## Integration Test
 
 ```bash
+# AgentCore mode (requires AWS credentials)
 AGENTCORE_IT=true mvn verify -pl spring-ai-bedrock-agentcore-browser
+
+# Local mode (no AWS credentials needed)
+mvn test -pl spring-ai-bedrock-agentcore-browser
 ```
 
 ## License

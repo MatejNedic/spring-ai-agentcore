@@ -34,9 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+import org.springframework.context.annotation.Import;
 
 /**
  * Integration test that verifies session context propagation through the full ChatClient
@@ -142,8 +140,8 @@ class BrowserChatFlowIT {
 		assertThat(screenshots2.get(0).url()).isEqualTo("https://docs.aws.amazon.com");
 	}
 
-	@SpringBootApplication(
-			exclude = { org.springaicommunity.agentcore.browser.AgentCoreBrowserAutoConfiguration.class })
+	@SpringBootApplication
+	@Import(AgentCoreBrowserTestConfiguration.class)
 	static class TestApp {
 
 		@Bean
@@ -155,33 +153,12 @@ class BrowserChatFlowIT {
 		}
 
 		@Bean
-		BedrockAgentCoreClient bedrockAgentCoreClient() {
-			return BedrockAgentCoreClient.create();
-		}
-
-		@Bean
-		AwsCredentialsProvider awsCredentialsProvider() {
-			return DefaultCredentialsProvider.builder().build();
-		}
-
-		@Bean
-		AgentCoreBrowserConfiguration browserConfiguration() {
-			return new AgentCoreBrowserConfiguration(null, null, null, null, null, null, null, null, null, null, null);
-		}
-
-		@Bean
-		AgentCoreBrowserClient agentCoreBrowserClient(BedrockAgentCoreClient client,
-				AgentCoreBrowserConfiguration config, AwsCredentialsProvider credentialsProvider) {
-			return new AgentCoreBrowserClient(client, config, credentialsProvider);
-		}
-
-		@Bean
 		BrowserScreenshotStore browserScreenshotStore() {
 			return new BrowserScreenshotStore(300);
 		}
 
 		@Bean
-		BrowserTools browserTools(AgentCoreBrowserClient client, BrowserScreenshotStore screenshotStore,
+		BrowserTools browserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
 				AgentCoreBrowserConfiguration config) {
 			return new BrowserTools(client, screenshotStore, config);
 		}
