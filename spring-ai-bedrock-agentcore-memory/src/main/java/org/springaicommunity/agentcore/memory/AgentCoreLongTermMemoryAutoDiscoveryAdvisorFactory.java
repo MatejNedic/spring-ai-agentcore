@@ -16,15 +16,12 @@
 
 package org.springaicommunity.agentcore.memory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryAdvisor.MemoryStrategy;
 import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryStrategyDiscovery.DiscoveredStrategy;
-import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryStrategyDiscovery.StrategyType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Factory for creating LTM advisors from autodiscovered strategies.
@@ -35,18 +32,6 @@ class AgentCoreLongTermMemoryAutoDiscoveryAdvisorFactory {
 
 	private static final Logger logger = LoggerFactory
 		.getLogger(AgentCoreLongTermMemoryAutoDiscoveryAdvisorFactory.class);
-
-	private record AdvisorConfig(MemoryStrategy strategy, String contextLabel) {
-	}
-
-	private static final Map<StrategyType, AdvisorConfig> ADVISOR_CONFIGS = Map.of(StrategyType.SEMANTIC,
-			new AdvisorConfig(MemoryStrategy.SEMANTIC, "Known facts about the user (use naturally in conversation)"),
-			StrategyType.USER_PREFERENCE,
-			new AdvisorConfig(MemoryStrategy.USER_PREFERENCE, "User preferences (apply when relevant)"),
-			StrategyType.SUMMARY,
-			new AdvisorConfig(MemoryStrategy.SUMMARY, "Previous conversation summaries (use for continuity)"),
-			StrategyType.EPISODIC,
-			new AdvisorConfig(MemoryStrategy.EPISODIC, "Past interactions and reflections (reference when relevant)"));
 
 	private final AgentCoreLongTermMemoryRetriever retriever;
 
@@ -75,16 +60,16 @@ class AgentCoreLongTermMemoryAutoDiscoveryAdvisorFactory {
 	}
 
 	private AgentCoreLongTermMemoryAdvisor createAdvisor(DiscoveredStrategy discovered) {
-		AdvisorConfig advisorConfig = ADVISOR_CONFIGS.get(discovered.type());
+		MemoryStrategiesMap.StrategyLabel strategyLabel = MemoryStrategiesMap.LABELS.get(discovered.type());
 		AgentCoreLongTermMemoryStrategy explicitConfig = getExplicitConfig(discovered);
 
 		boolean configMatches = explicitConfig != null && discovered.strategyId().equals(explicitConfig.strategyId());
 		String namespace = resolveNamespace(discovered, configMatches ? explicitConfig : null);
 		Integer topK = configMatches ? getTopK(explicitConfig) : null;
 
-		var builder = AgentCoreLongTermMemoryAdvisor.builder(retriever, advisorConfig.strategy())
+		var builder = AgentCoreLongTermMemoryAdvisor.builder(retriever, strategyLabel.strategy())
 			.strategyId(discovered.strategyId())
-			.contextLabel(advisorConfig.contextLabel())
+			.contextLabel(strategyLabel.contextLabel())
 			.namespacePattern(namespace);
 
 		if (topK != null) {

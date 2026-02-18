@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryAdvisor.MemoryStrategy;
 import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryStrategyDiscovery.DiscoveredStrategy;
+import org.springaicommunity.agentcore.memory.AgentCoreLongTermMemoryStrategyDiscovery.StrategyType;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
@@ -185,7 +186,7 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 		var semanticConfig = config.semantic();
 		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.SEMANTIC)
 			.strategyId(semanticConfig.strategyId())
-			.contextLabel("Known facts about the user (use naturally in conversation)")
+			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.SEMANTIC))
 			.topK(semanticConfig.topK())
 			.namespacePattern(semanticConfig.resolveNamespacePattern())
 			.build();
@@ -202,7 +203,7 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 		var prefConfig = config.userPreference();
 		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.USER_PREFERENCE)
 			.strategyId(prefConfig.strategyId())
-			.contextLabel("User preferences (apply when relevant)")
+			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.USER_PREFERENCE))
 			.namespacePattern(prefConfig.resolveNamespacePattern())
 			.build();
 	}
@@ -217,7 +218,7 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 		var summaryConfig = config.summary();
 		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.SUMMARY)
 			.strategyId(summaryConfig.strategyId())
-			.contextLabel("Previous conversation summaries (use for continuity)")
+			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.SUMMARY))
 			.topK(summaryConfig.topK())
 			.namespacePattern(summaryConfig.resolveNamespacePattern())
 			.build();
@@ -234,7 +235,7 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.EPISODIC)
 			.strategyId(episodicConfig.strategyId())
 			.reflectionsStrategyId(episodicConfig.reflectionsStrategyId())
-			.contextLabel("Past interactions and reflections (reference when relevant)")
+			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.EPISODIC))
 			.topK(episodicConfig.episodesTopK())
 			.reflectionsTopK(episodicConfig.reflectionsTopK())
 			.namespacePattern(episodicConfig.resolveNamespacePattern())
