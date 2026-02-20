@@ -16,6 +16,7 @@
 
 package org.springaicommunity.agentcore.codeinterpreter;
 
+import org.springaicommunity.agentcore.artifacts.ArtifactStoreFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -26,12 +27,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * "aws.codeinterpreter.v1")
  * @param fileStoreTtlSeconds TTL for file store cache entries in seconds (default 300)
  * @param asyncTimeoutSeconds timeout for async operations in seconds (default 300)
+ * @param artifactStoreMaxSize maximum sessions in artifact store (default 10000)
  * @param toolDescription custom tool description for LLM (optional, uses default if null)
  * @author Yuriy Bezsonov
  */
 @ConfigurationProperties(prefix = "agentcore.code-interpreter")
 public record AgentCoreCodeInterpreterConfiguration(Integer sessionTimeoutSeconds, String codeInterpreterIdentifier,
-		Integer fileStoreTtlSeconds, Integer asyncTimeoutSeconds, String toolDescription) {
+		Integer fileStoreTtlSeconds, Integer asyncTimeoutSeconds, Integer artifactStoreMaxSize,
+		String toolDescription) {
 
 	public AgentCoreCodeInterpreterConfiguration {
 		if (sessionTimeoutSeconds == null || sessionTimeoutSeconds <= 0) {
@@ -45,6 +48,9 @@ public record AgentCoreCodeInterpreterConfiguration(Integer sessionTimeoutSecond
 		}
 		if (asyncTimeoutSeconds == null || asyncTimeoutSeconds <= 0) {
 			asyncTimeoutSeconds = 300; // 5 minutes default
+		}
+		if (artifactStoreMaxSize == null || artifactStoreMaxSize <= 0) {
+			artifactStoreMaxSize = ArtifactStoreFactory.DEFAULT_MAX_SIZE;
 		}
 		// toolDescription can be null - will use DEFAULT_TOOL_DESCRIPTION
 	}

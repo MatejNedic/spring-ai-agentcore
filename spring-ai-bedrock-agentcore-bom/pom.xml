@@ -20,6 +20,11 @@
         <dependencies>
             <dependency>
                 <groupId>org.springaicommunity</groupId>
+                <artifactId>spring-ai-bedrock-agentcore-artifact-store</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springaicommunity</groupId>
                 <artifactId>spring-ai-bedrock-agentcore-runtime-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>

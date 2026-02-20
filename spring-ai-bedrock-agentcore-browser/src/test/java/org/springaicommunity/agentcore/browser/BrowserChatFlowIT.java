@@ -23,6 +23,10 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.CaffeineArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.bedrock.converse.BedrockProxyChatModel;
 import org.springframework.ai.chat.client.ChatClient;
@@ -31,6 +35,7 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
@@ -54,7 +59,8 @@ class BrowserChatFlowIT {
 	private BrowserTools tools;
 
 	@Autowired
-	private BrowserScreenshotStore screenshotStore;
+	@Qualifier("browserArtifactStore")
+	private ArtifactStore<GeneratedFile> artifactStore;
 
 	@Test
 	@DisplayName("Should propagate session ID through ChatClient streaming flow for screenshots")
@@ -74,10 +80,10 @@ class BrowserChatFlowIT {
 
 		// Execute chat with streaming - triggers tool execution on boundedElastic thread
 		String response = chatClient.prompt()
-			.user("Take a screenshot of https://example.com")
+			.user("Take a screenshot of https://docs.aws.amazon.com")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId))
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, sessionId))
 			.collectList()
 			.map(chunks -> String.join("", chunks))
 			.block();
@@ -85,11 +91,12 @@ class BrowserChatFlowIT {
 		assertThat(response).isNotNull();
 
 		// Verify screenshot was stored under correct session ID
-		assertThat(screenshotStore.hasScreenshots(sessionId)).isTrue();
+		assertThat(artifactStore.hasArtifacts(sessionId)).isTrue();
 
-		List<BrowserScreenshot> screenshots = screenshotStore.retrieve(sessionId);
+		List<GeneratedFile> screenshots = artifactStore.retrieve(sessionId);
 		assertThat(screenshots).hasSize(1);
-		assertThat(screenshots.get(0).url()).isEqualTo("https://example.com");
+		assertThat(screenshots.get(0).isImage()).isTrue();
+		assertThat(BrowserArtifacts.url(screenshots.get(0))).hasValue("https://docs.aws.amazon.com");
 	}
 
 	@Test
@@ -109,35 +116,35 @@ class BrowserChatFlowIT {
 			.defaultSystem("Take screenshots when asked.")
 			.build();
 
-		// Session 1: screenshot of example.com
-		chatClient.prompt()
-			.user("Take a screenshot of https://example.com")
-			.stream()
-			.content()
-			.contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, session1))
-			.collectList()
-			.block();
-
-		// Session 2: screenshot of docs.aws.amazon.com
+		// Session 1: screenshot of docs.aws.amazon.com
 		chatClient.prompt()
 			.user("Take a screenshot of https://docs.aws.amazon.com")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, session2))
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, session1))
+			.collectList()
+			.block();
+
+		// Session 2: screenshot of aws.amazon.com
+		chatClient.prompt()
+			.user("Take a screenshot of https://aws.amazon.com")
+			.stream()
+			.content()
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, session2))
 			.collectList()
 			.block();
 
 		// Verify session isolation
-		assertThat(screenshotStore.hasScreenshots(session1)).isTrue();
-		assertThat(screenshotStore.hasScreenshots(session2)).isTrue();
+		assertThat(artifactStore.hasArtifacts(session1)).isTrue();
+		assertThat(artifactStore.hasArtifacts(session2)).isTrue();
 
-		List<BrowserScreenshot> screenshots1 = screenshotStore.retrieve(session1);
+		List<GeneratedFile> screenshots1 = artifactStore.retrieve(session1);
 		assertThat(screenshots1).hasSize(1);
-		assertThat(screenshots1.get(0).url()).isEqualTo("https://example.com");
+		assertThat(screenshots1.get(0).isImage()).isTrue();
 
-		List<BrowserScreenshot> screenshots2 = screenshotStore.retrieve(session2);
+		List<GeneratedFile> screenshots2 = artifactStore.retrieve(session2);
 		assertThat(screenshots2).hasSize(1);
-		assertThat(screenshots2.get(0).url()).isEqualTo("https://docs.aws.amazon.com");
+		assertThat(screenshots2.get(0).isImage()).isTrue();
 	}
 
 	@SpringBootApplication
@@ -153,14 +160,14 @@ class BrowserChatFlowIT {
 		}
 
 		@Bean
-		BrowserScreenshotStore browserScreenshotStore() {
-			return new BrowserScreenshotStore(300);
+		ArtifactStore<GeneratedFile> browserArtifactStore() {
+			return new CaffeineArtifactStore<>(300, "BrowserArtifactStore");
 		}
 
 		@Bean
-		BrowserTools browserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
+		BrowserTools browserTools(BrowserClient client, ArtifactStore<GeneratedFile> browserArtifactStore,
 				AgentCoreBrowserConfiguration config) {
-			return new BrowserTools(client, screenshotStore, config);
+			return new BrowserTools(client, browserArtifactStore, config);
 		}
 
 	}

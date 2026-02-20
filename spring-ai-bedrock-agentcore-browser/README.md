@@ -9,21 +9,35 @@ Supports two modes:
 ## Features
 
 - Browse web pages and extract text content
-- Take screenshots with session-scoped storage
+- Take screenshots with session-scoped artifact storage
 - Click elements, fill forms, execute JavaScript
 - Configurable tool descriptions for LLM
-- TTL-based cache cleanup
+- TTL-based artifact cache cleanup
+- Thread-safe multi-session support
 
 ## Quick Start
 
-Add the dependency:
+Add the BOM and dependency:
 
 ```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-bedrock-agentcore-browser</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-</dependency>
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>spring-ai-bedrock-agentcore-bom</artifactId>
+            <version>${version}</version>  <!-- Use latest: 1.0.0-RC2, 1.0.0-RC3, etc. -->
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-bedrock-agentcore-browser</artifactId>
+    </dependency>
+</dependencies>
 ```
 
 Inject the tool provider:
@@ -33,14 +47,14 @@ Inject the tool provider:
 public class ChatService {
 
     private final ChatClient chatClient;
-    private final BrowserScreenshotStore screenshotStore;
+    private final ArtifactStore<GeneratedFile> artifactStore;
 
     public ChatService(
             ChatClient.Builder chatClientBuilder,
             @Qualifier("browserToolCallbackProvider") ToolCallbackProvider browserTools,
-            BrowserScreenshotStore screenshotStore) {
+            @Qualifier("browserArtifactStore") ArtifactStore<GeneratedFile> artifactStore) {
 
-        this.screenshotStore = screenshotStore;
+        this.artifactStore = artifactStore;
         this.chatClient = chatClientBuilder
             .defaultToolCallbacks(browserTools)
             .build();
@@ -53,17 +67,18 @@ public class ChatService {
             .content()
             .concatWith(Flux.defer(() -> appendScreenshots(sessionId)))
             // Store sessionId in Reactor context for tools
-            .contextWrite(ctx -> ctx.put(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId));
+            .contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, sessionId));
     }
 
     private Flux<String> appendScreenshots(String sessionId) {
-        List<BrowserScreenshot> screenshots = screenshotStore.retrieve(sessionId);
+        List<GeneratedFile> screenshots = artifactStore.retrieve(sessionId);
         if (screenshots == null || screenshots.isEmpty()) {
             return Flux.empty();
         }
         StringBuilder sb = new StringBuilder();
-        for (BrowserScreenshot s : screenshots) {
-            sb.append("\n\n![Screenshot of ").append(s.url()).append("](")
+        for (GeneratedFile s : screenshots) {
+            String url = BrowserArtifacts.url(s).orElse("unknown");
+            sb.append("\n\n![Screenshot of ").append(url).append("](")
               .append(s.toDataUrl()).append(")");
         }
         return Flux.just(sb.toString());
@@ -76,13 +91,12 @@ public class ChatService {
 Session ID is passed via Reactor context and read using Spring AI's `ToolCallReactiveContextHolder`. This is required because tool execution happens on `Schedulers.boundedElastic()` thread pool, not the HTTP request thread.
 
 ```java
-// BrowserTools reads session ID from Reactor context
+// BrowserTools reads session ID from Reactor context using SessionConstants
 public class BrowserTools {
-    public static final String SESSION_ID_CONTEXT_KEY = "sessionId";
 
     public String takeScreenshot(String url) {
         ContextView ctx = ToolCallReactiveContextHolder.getContext();
-        String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, DEFAULT_SESSION_ID);
+        String sessionId = ctx.getOrDefault(SessionConstants.SESSION_ID_KEY, SessionConstants.DEFAULT_SESSION_ID);
         // ... store screenshot by sessionId
     }
 }
@@ -109,6 +123,7 @@ agentcore.browser.viewport-width=1456
 agentcore.browser.viewport-height=819
 agentcore.browser.max-content-length=10000
 agentcore.browser.screenshot-ttl-seconds=300
+agentcore.browser.artifact-store-max-size=10000  # max sessions in artifact store
 
 # Custom tool descriptions (optional)
 agentcore.browser.browse-url-description=...
@@ -117,6 +132,14 @@ agentcore.browser.click-description=...
 agentcore.browser.fill-description=...
 agentcore.browser.evaluate-description=...
 ```
+
+## Artifact Store
+
+Screenshots are stored in a session-scoped `ArtifactStore<GeneratedFile>` from the [artifact-store module](../spring-ai-bedrock-agentcore-artifact-store/README.md).
+
+Helper methods in `BrowserArtifacts`:
+- `BrowserArtifacts.url(file)` - Extract URL from screenshot metadata
+- `BrowserArtifacts.width(file)` / `height(file)` - Get dimensions
 
 ## Local Development
 

@@ -54,14 +54,16 @@ Spring AI integration with Amazon Bedrock AgentCore Code Interpreter. Executes P
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                   CodeInterpreterFileStore                      │
+│                 ArtifactStore<GeneratedFile>                    │
 │            (Session-scoped file storage with TTL)               │
 ├─────────────────────────────────────────────────────────────────┤
-│  DEFAULT_SESSION_ID = "default"                                 │
-│  Caffeine cache with TTL (default 5 min) and max 1000 entries   │
-│  store(sessionId, files)  // store files for session            │
+│  DEFAULT_CATEGORY = "default"                                   │
+│  Caffeine cache with TTL (default 5 min) and max entries        │
+│  store(sessionId, file)  // store with default category         │
+│  store(sessionId, category, file)  // store with category       │
 │  retrieve(sessionId) → List<GeneratedFile>  // get and clear    │
-│  hasFiles(sessionId) → boolean                                  │
+│  retrieve(sessionId, category) → List<GeneratedFile>            │
+│  hasArtifacts(sessionId) → boolean                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,8 +74,8 @@ Spring AI integration with Amazon Bedrock AgentCore Code Interpreter. Executes P
 | `AgentCoreCodeInterpreterAutoConfiguration` | Spring Boot auto-config with `ToolCallbackProvider` |
 | `AgentCoreCodeInterpreterClient` | Low-level SDK wrapper with configurable timeouts |
 | `AgentCoreCodeInterpreterConfiguration` | Config properties (timeouts, TTL, identifier, description) |
-| `CodeInterpreterTools` | Tool implementation with session context from `ToolCallReactiveContextHolder` |
-| `CodeInterpreterFileStore` | Session-scoped file storage with Caffeine cache and TTL |
+| `CodeInterpreterTools` | Tool implementation with session context and optional category support |
+| `CodeInterpreterArtifacts` | Helper for creating artifacts with metadata |
 | `CodeExecutionResult` | Record for execution results with null-safe defaults |
 | `GeneratedFile` | Record for file data with defensive copy and helper methods |
 | `ExecuteCodeRequest` | Input schema record for the tool (language, code) |
@@ -98,7 +100,7 @@ Spring AI integration with Amazon Bedrock AgentCore Code Interpreter. Executes P
 5. CodeInterpreterTools.executeCode(language, code):
    a. Get sessionId from ToolCallReactiveContextHolder (or use DEFAULT_SESSION_ID)
    b. client.executeInEphemeralSession(language, code)
-   c. fileStore.store(sessionId, files)
+   c. artifactStore.store(sessionId, files)
    d. Return text-only result to LLM
 6. Spring AI clears ThreadLocal in finally block
 7. LLM responds: "Here's your Q1 sales chart..."

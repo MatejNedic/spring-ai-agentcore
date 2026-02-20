@@ -20,6 +20,9 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import reactor.util.context.ContextView;
 
@@ -35,13 +38,12 @@ public class CodeInterpreterTools {
 
 	private static final Logger logger = LoggerFactory.getLogger(CodeInterpreterTools.class);
 
-	private static final Set<String> SUPPORTED_LANGUAGES = Set.of("python", "javascript", "typescript");
-
 	/**
-	 * Reactor context key for session ID. Callers should store session ID under this key
-	 * via `.contextWrite(ctx -> ctx.put(SESSION_ID_CONTEXT_KEY, sessionId))`.
+	 * Category used when storing artifacts. Use this when retrieving from shared store.
 	 */
-	public static final String SESSION_ID_CONTEXT_KEY = "sessionId";
+	public static final String CATEGORY = "codeinterpreter";
+
+	private static final Set<String> SUPPORTED_LANGUAGES = Set.of("python", "javascript", "typescript");
 
 	public static final String DEFAULT_TOOL_DESCRIPTION = """
 			Execute code in a secure sandbox environment.
@@ -54,12 +56,33 @@ public class CodeInterpreterTools {
 
 	private final AgentCoreCodeInterpreterClient client;
 
-	private final CodeInterpreterFileStore fileStore;
+	private final ArtifactStore<GeneratedFile> artifactStore;
 
-	public CodeInterpreterTools(AgentCoreCodeInterpreterClient client, CodeInterpreterFileStore fileStore) {
+	private final String category;
+
+	/**
+	 * Create CodeInterpreterTools with default category (artifacts stored without
+	 * category).
+	 * @param client the code interpreter client
+	 * @param artifactStore the artifact store
+	 */
+	public CodeInterpreterTools(AgentCoreCodeInterpreterClient client, ArtifactStore<GeneratedFile> artifactStore) {
+		this(client, artifactStore, null);
+	}
+
+	/**
+	 * Create CodeInterpreterTools with explicit category for artifact storage.
+	 * @param client the code interpreter client
+	 * @param artifactStore the artifact store
+	 * @param category the category for storing artifacts (null for default category)
+	 */
+	public CodeInterpreterTools(AgentCoreCodeInterpreterClient client, ArtifactStore<GeneratedFile> artifactStore,
+			String category) {
 		this.client = client;
-		this.fileStore = fileStore;
-		logger.debug("CodeInterpreterTools initialized");
+		this.artifactStore = artifactStore;
+		this.category = category;
+		logger.debug("CodeInterpreterTools initialized with category: {}",
+				category != null ? category : ArtifactStore.DEFAULT_CATEGORY);
 	}
 
 	/**
@@ -85,10 +108,7 @@ public class CodeInterpreterTools {
 		// Get session ID from Reactor context (available via
 		// ToolCallReactiveContextHolder)
 		ContextView ctx = ToolCallReactiveContextHolder.getContext();
-		String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, CodeInterpreterFileStore.DEFAULT_SESSION_ID);
-		if (sessionId == null || sessionId.isBlank()) {
-			sessionId = CodeInterpreterFileStore.DEFAULT_SESSION_ID;
-		}
+		String sessionId = ctx.getOrDefault(SessionConstants.SESSION_ID_KEY, SessionConstants.DEFAULT_SESSION_ID);
 
 		logger.debug("executeCode called: language={}, sessionId={}, code:\n{}", normalizedLanguage, sessionId, code);
 
@@ -97,10 +117,16 @@ public class CodeInterpreterTools {
 		logger.debug("Result: {} chars text, {} files, isError={}", result.textOutput().length(), result.files().size(),
 				result.isError());
 
-		// Store files for ChatService to append later (keyed by session ID)
+		// Store files for ChatService to append later (keyed by session ID and category)
 		if (result.hasFiles()) {
-			this.fileStore.store(sessionId, result.files());
-			logger.debug("Stored {} files for session {}", result.files().size(), sessionId);
+			if (this.category != null) {
+				this.artifactStore.storeAll(sessionId, this.category, result.files());
+			}
+			else {
+				this.artifactStore.storeAll(sessionId, result.files());
+			}
+			logger.debug("Stored {} files for session {} in category {}", result.files().size(), sessionId,
+					this.category != null ? this.category : ArtifactStore.DEFAULT_CATEGORY);
 		}
 
 		return formatTextForLlm(result);

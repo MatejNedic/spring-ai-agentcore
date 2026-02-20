@@ -18,6 +18,8 @@ package org.springaicommunity.agentcore.codeinterpreter;
 
 import java.util.List;
 
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+
 /**
  * Immutable result of code execution.
  *

@@ -32,6 +32,10 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.CaffeineArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -56,14 +60,14 @@ class CodeInterpreterToolsIT {
 	@Autowired
 	private AgentCoreCodeInterpreterClient client;
 
-	private CodeInterpreterFileStore fileStore;
+	private ArtifactStore<GeneratedFile> artifactStore;
 
 	private CodeInterpreterTools tools;
 
 	@BeforeEach
 	void setUp() {
-		fileStore = new CodeInterpreterFileStore(300);
-		tools = new CodeInterpreterTools(client, fileStore);
+		artifactStore = new CaffeineArtifactStore<>(300, "CodeInterpreterArtifactStore");
+		tools = new CodeInterpreterTools(client, artifactStore);
 	}
 
 	@AfterEach
@@ -72,8 +76,7 @@ class CodeInterpreterToolsIT {
 	}
 
 	private void setSessionId(String sessionId) {
-		Context ctx = sessionId != null ? Context.of(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, sessionId)
-				: Context.empty();
+		Context ctx = sessionId != null ? Context.of(SessionConstants.SESSION_ID_KEY, sessionId) : Context.empty();
 		ToolCallReactiveContextHolder.setContext(ctx);
 	}
 
@@ -131,9 +134,9 @@ class CodeInterpreterToolsIT {
 		String result = tools.executeCode("python", code);
 
 		assertThat(result).contains("done");
-		assertThat(fileStore.hasFiles("image-session")).isTrue();
+		assertThat(artifactStore.hasArtifacts("image-session")).isTrue();
 
-		List<GeneratedFile> files = fileStore.retrieve("image-session");
+		List<GeneratedFile> files = artifactStore.retrieve("image-session");
 		assertThat(files).isNotEmpty();
 
 		GeneratedFile imageFile = files.stream().filter(GeneratedFile::isImage).findFirst().orElse(null);
@@ -159,9 +162,9 @@ class CodeInterpreterToolsIT {
 		String result = tools.executeCode("python", code);
 
 		assertThat(result).contains("csv created");
-		assertThat(fileStore.hasFiles("csv-session")).isTrue();
+		assertThat(artifactStore.hasArtifacts("csv-session")).isTrue();
 
-		List<GeneratedFile> files = fileStore.retrieve("csv-session");
+		List<GeneratedFile> files = artifactStore.retrieve("csv-session");
 		assertThat(files).isNotEmpty();
 	}
 
@@ -183,7 +186,7 @@ class CodeInterpreterToolsIT {
 
 		tools.executeCode("python", code);
 
-		assertThat(fileStore.hasFiles(CodeInterpreterFileStore.DEFAULT_SESSION_ID)).isTrue();
+		assertThat(artifactStore.hasArtifacts(SessionConstants.DEFAULT_SESSION_ID)).isTrue();
 	}
 
 	@Test
@@ -208,13 +211,13 @@ class CodeInterpreterToolsIT {
 				print('s2')
 				""");
 
-		List<GeneratedFile> files1 = fileStore.retrieve("session-1");
-		List<GeneratedFile> files2 = fileStore.retrieve("session-2");
+		List<GeneratedFile> files1 = artifactStore.retrieve("session-1");
+		List<GeneratedFile> files2 = artifactStore.retrieve("session-2");
 
 		assertThat(files1).isNotEmpty();
 		assertThat(files2).isNotEmpty();
-		assertThat(fileStore.hasFiles("session-1")).isFalse();
-		assertThat(fileStore.hasFiles("session-2")).isFalse();
+		assertThat(artifactStore.hasArtifacts("session-1")).isFalse();
+		assertThat(artifactStore.hasArtifacts("session-2")).isFalse();
 	}
 
 	@Test
@@ -231,10 +234,10 @@ class CodeInterpreterToolsIT {
 				print('ok')
 				""");
 
-		assertThat(fileStore.hasFiles("clear-session")).isTrue();
-		fileStore.retrieve("clear-session");
-		assertThat(fileStore.hasFiles("clear-session")).isFalse();
-		assertThat(fileStore.retrieve("clear-session")).isNull();
+		assertThat(artifactStore.hasArtifacts("clear-session")).isTrue();
+		artifactStore.retrieve("clear-session");
+		assertThat(artifactStore.hasArtifacts("clear-session")).isFalse();
+		assertThat(artifactStore.retrieve("clear-session")).isNull();
 	}
 
 	@Test
@@ -259,15 +262,15 @@ class CodeInterpreterToolsIT {
 				print('second')
 				""");
 
-		List<GeneratedFile> files = fileStore.retrieve("accumulate-session");
+		List<GeneratedFile> files = artifactStore.retrieve("accumulate-session");
 		assertThat(files.size()).isGreaterThanOrEqualTo(2);
 	}
 
 	@Test
 	@Order(10)
-	@DisplayName("Should hasFiles return correctly")
-	void shouldHasFilesReturnCorrectly() {
-		assertThat(fileStore.hasFiles("nonexistent-session")).isFalse();
+	@DisplayName("Should hasArtifacts return correctly")
+	void shouldHasArtifactsReturnCorrectly() {
+		assertThat(artifactStore.hasArtifacts("nonexistent-session")).isFalse();
 
 		setSessionId("has-files-session");
 		tools.executeCode("python", """
@@ -278,7 +281,7 @@ class CodeInterpreterToolsIT {
 				print('ok')
 				""");
 
-		assertThat(fileStore.hasFiles("has-files-session")).isTrue();
+		assertThat(artifactStore.hasArtifacts("has-files-session")).isTrue();
 	}
 
 	// ========== GeneratedFile helper tests ==========
@@ -297,7 +300,7 @@ class CodeInterpreterToolsIT {
 				print('ok')
 				""");
 
-		List<GeneratedFile> files = fileStore.retrieve("dataurl-session");
+		List<GeneratedFile> files = artifactStore.retrieve("dataurl-session");
 		GeneratedFile imageFile = files.stream().filter(GeneratedFile::isImage).findFirst().orElse(null);
 
 		assertThat(imageFile).isNotNull();
@@ -320,7 +323,7 @@ class CodeInterpreterToolsIT {
 				print('ok')
 				""");
 
-		List<GeneratedFile> files = fileStore.retrieve("size-session");
+		List<GeneratedFile> files = artifactStore.retrieve("size-session");
 		GeneratedFile file = files.stream().filter(GeneratedFile::isImage).findFirst().orElse(null);
 
 		assertThat(file).isNotNull();
@@ -427,7 +430,8 @@ class CodeInterpreterToolsIT {
 	@Order(21)
 	@DisplayName("Should isolate files between parallel sessions")
 	void shouldIsolateFilesBetweenParallelSessions() throws Exception {
-		CodeInterpreterFileStore sharedStore = new CodeInterpreterFileStore(300);
+		ArtifactStore<GeneratedFile> sharedStore = new CaffeineArtifactStore<>(300,
+				"SharedCodeInterpreterArtifactStore");
 		CountDownLatch startLatch = new CountDownLatch(1);
 		CountDownLatch doneLatch = new CountDownLatch(2);
 
@@ -440,7 +444,7 @@ class CodeInterpreterToolsIT {
 		executor.submit(() -> {
 			try {
 				ToolCallReactiveContextHolder
-					.setContext(Context.of(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, "parallel-session-1"));
+					.setContext(Context.of(SessionConstants.SESSION_ID_KEY, "parallel-session-1"));
 				CodeInterpreterTools tools1 = new CodeInterpreterTools(client, sharedStore);
 
 				startLatch.await();
@@ -467,7 +471,7 @@ class CodeInterpreterToolsIT {
 		executor.submit(() -> {
 			try {
 				ToolCallReactiveContextHolder
-					.setContext(Context.of(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, "parallel-session-2"));
+					.setContext(Context.of(SessionConstants.SESSION_ID_KEY, "parallel-session-2"));
 				CodeInterpreterTools tools2 = new CodeInterpreterTools(client, sharedStore);
 
 				startLatch.await();
@@ -503,8 +507,8 @@ class CodeInterpreterToolsIT {
 		assertThat(session2Files.get().stream().anyMatch(f -> f.name().contains("chart2"))).isTrue();
 
 		// Verify store is empty for both sessions
-		assertThat(sharedStore.hasFiles("parallel-session-1")).isFalse();
-		assertThat(sharedStore.hasFiles("parallel-session-2")).isFalse();
+		assertThat(sharedStore.hasArtifacts("parallel-session-1")).isFalse();
+		assertThat(sharedStore.hasArtifacts("parallel-session-2")).isFalse();
 	}
 
 	@SpringBootApplication(exclude = {
@@ -523,7 +527,7 @@ class CodeInterpreterToolsIT {
 
 		@Bean
 		AgentCoreCodeInterpreterConfiguration codeInterpreterConfiguration() {
-			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null);
+			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null, null);
 		}
 
 		@Bean

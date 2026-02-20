@@ -19,9 +19,14 @@ package org.springaicommunity.agentcore.browser;
 import com.microsoft.playwright.Playwright;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.ArtifactStoreFactory;
+import org.springaicommunity.agentcore.artifacts.CaffeineArtifactStoreFactory;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -109,17 +114,27 @@ public class AgentCoreBrowserAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	BrowserScreenshotStore browserScreenshotStore(AgentCoreBrowserConfiguration config) {
-		logger.debug("Creating BrowserScreenshotStore bean: ttl={}s", config.screenshotTtlSeconds());
-		return new BrowserScreenshotStore(config.screenshotTtlSeconds());
+	ArtifactStoreFactory artifactStoreFactory() {
+		logger.debug("Creating ArtifactStoreFactory bean");
+		return new CaffeineArtifactStoreFactory();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(name = "browserArtifactStore")
+	ArtifactStore<GeneratedFile> browserArtifactStore(ArtifactStoreFactory factory,
+			AgentCoreBrowserConfiguration config) {
+		logger.debug("Creating browserArtifactStore bean: ttl={}s, maxSize={}", config.screenshotTtlSeconds(),
+				config.artifactStoreMaxSize());
+		return factory.create("BrowserArtifactStore", config.screenshotTtlSeconds(), config.artifactStoreMaxSize());
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	BrowserTools browserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
+	BrowserTools browserTools(BrowserClient client,
+			@Qualifier("browserArtifactStore") ArtifactStore<GeneratedFile> browserArtifactStore,
 			AgentCoreBrowserConfiguration config) {
 		logger.debug("Creating BrowserTools bean");
-		return new BrowserTools(client, screenshotStore, config);
+		return new BrowserTools(client, browserArtifactStore, config);
 	}
 
 	@Bean

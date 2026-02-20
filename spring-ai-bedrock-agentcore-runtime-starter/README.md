@@ -16,11 +16,24 @@ A Spring Boot starter that enables existing Spring Boot applications to conform 
 ### 1. Add Dependency
 
 ```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-bedrock-agentcore-runtime-starter</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-</dependency>
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>spring-ai-bedrock-agentcore-bom</artifactId>
+            <version>${version}</version>  <!-- Use latest: 1.0.0-RC2, 1.0.0-RC3, etc. -->
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-bedrock-agentcore-runtime-starter</artifactId>
+    </dependency>
+</dependencies>
 ```
 
 ### 2. Create Agent Method
@@ -28,7 +41,7 @@ A Spring Boot starter that enables existing Spring Boot applications to conform 
 ```java
 @Service
 public class MyAgentService {
-    
+
     @AgentCoreInvocation
     public String handleUserPrompt(MyRequest request) {
         return "You said: " + request.prompt;
@@ -172,11 +185,11 @@ The starter includes `AgentCoreTaskTracker` to communicate this state to the run
 @AgentCoreInvocation
 public String asyncTaskHandling(MyRequest request, AgentCoreContext context) {
     agentCoreTaskTracker.increment();  // Tell runtime: "I'm starting background work"
-    
+
     CompletableFuture.runAsync(() -> {
         // Long-running background work
     }).thenRun(agentCoreTaskTracker::decrement);  // Tell runtime: "Background work completed"
-    
+
     return "Task started";
 }
 ```
@@ -242,7 +255,7 @@ Rate limits are applied per client IP address and reset every minute.
 **Response (503) - When Actuator detects issues:**
 ```json
 {
-  "status": "Unhealthy", 
+  "status": "Unhealthy",
   "time_of_last_update": 1697123456
 }
 ```

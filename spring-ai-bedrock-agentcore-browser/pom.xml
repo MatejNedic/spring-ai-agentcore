@@ -74,8 +74,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>spring-ai-bedrock-agentcore-artifact-store</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>

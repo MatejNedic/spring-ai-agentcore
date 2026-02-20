@@ -48,6 +48,12 @@ Basic AgentCore integration with minimal configuration. Demonstrates:
 - Simple request/response handling
 - Health checks and task tracking
 
+### spring-ai-browser
+Browser automation example using AgentCore Browser. Features:
+- Headless browser navigation and content extraction
+- Screenshot capture and local file saving
+- Local mode (Playwright) and AgentCore mode support
+
 ### spring-ai-sse-chat-client
 Server-Sent Events streaming with Spring AI integration. Features:
 - `Flux<String>` streaming responses
@@ -89,7 +95,7 @@ app_name = "SpringAiAgentJava"
 
 ## Deployment Workflow
 
-1. **Initial setup**: 
+1. **Initial setup**:
    - `./build-and-push.sh` (creates ECR repo and pushes image)
    - `terraform init && terraform apply` (creates runtimes)
 2. **Development cycle**:

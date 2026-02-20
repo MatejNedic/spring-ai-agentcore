@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreAsyncClient;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 import software.amazon.awssdk.services.bedrockagentcore.model.*;
@@ -386,31 +387,41 @@ public class AgentCoreCodeInterpreterClient {
 			String mimeType = content.mimeType();
 			byte[] data = content.data().asByteArray();
 			String name = determineFileName(mimeType, files.size(), requestedPaths);
-			files.add(new GeneratedFile(mimeType, data, name));
+			String sourcePath = determineSourcePath(files.size(), requestedPaths);
+			files.add(CodeInterpreterArtifacts.fromPath(mimeType, data, name, sourcePath));
 			logger.debug("Read file (data): {} ({} bytes, {})", name, data.length, mimeType);
 		}
 		// Handle resource type - binary data is in resource.blob()
 		else if (content.resource() != null) {
 			var resource = content.resource();
 			String mimeType = resource.mimeType() != null ? resource.mimeType() : content.mimeType();
+			String sourcePath = resource.uri() != null ? resource.uri()
+					: determineSourcePath(files.size(), requestedPaths);
 			String name = resource.uri() != null ? extractFileNameFromUri(resource.uri())
 					: determineFileName(mimeType, files.size(), requestedPaths);
 
 			if (resource.blob() != null) {
 				byte[] data = resource.blob().asByteArray();
-				files.add(new GeneratedFile(mimeType, data, name));
+				files.add(CodeInterpreterArtifacts.fromPath(mimeType, data, name, sourcePath));
 				logger.debug("Read file (resource blob): {} ({} bytes, {})", name, data.length, mimeType);
 			}
 			else if (resource.text() != null && !resource.text().isEmpty()) {
 				// Handle text content (for CSV, TXT, etc.)
 				byte[] data = resource.text().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-				files.add(new GeneratedFile(mimeType, data, name));
+				files.add(CodeInterpreterArtifacts.fromPath(mimeType, data, name, sourcePath));
 				logger.debug("Read file (resource text): {} ({} bytes, {})", name, data.length, mimeType);
 			}
 			else {
 				logger.warn("Resource {} has no blob or text content", name);
 			}
 		}
+	}
+
+	private String determineSourcePath(int index, List<String> requestedPaths) {
+		if (requestedPaths != null && index < requestedPaths.size()) {
+			return requestedPaths.get(index);
+		}
+		return null;
 	}
 
 	private String determineFileName(String mimeType, int index, List<String> requestedPaths) {

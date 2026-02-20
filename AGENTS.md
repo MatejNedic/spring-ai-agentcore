@@ -10,18 +10,36 @@ Spring Boot starter that enables Spring Boot applications to conform to the Amaz
 
 ```
 spring-ai-bedrock-agentcore/
+├── spring-ai-bedrock-agentcore-artifact-store/    # Shared artifact storage
 ├── spring-ai-bedrock-agentcore-runtime-starter/   # Runtime starter (invocations, ping, SSE)
-├── spring-ai-bedrock-agentcore-memory/    # Memory integration (STM + LTM)
-├── examples/                               # Working examples
-└── scripts/                                # Helper scripts
+├── spring-ai-bedrock-agentcore-memory/            # Memory integration (STM + LTM)
+├── spring-ai-bedrock-agentcore-browser/           # Browser automation tools
+├── spring-ai-bedrock-agentcore-codeinterpreter/   # Code interpreter tools
+├── examples/                                       # Working examples
+└── scripts/                                        # Helper scripts
 ```
 
 ### Key Components
 
-| Module | Purpose | Entry Point                                                                                                 |
-|--------|---------|-------------------------------------------------------------------------------------------------------------|
-| `starter` | AgentCore Runtime contract | `AgentCoreAutoConfiguration.java`                                                                           |
+| Module | Purpose | Entry Point |
+|--------|---------|-------------|
+| `artifact-store` | Session-scoped artifact storage | `ArtifactStore.java`, `CaffeineArtifactStore.java` |
+| `starter` | AgentCore Runtime contract | `AgentCoreAutoConfiguration.java` |
 | `memory` | Spring AI ChatMemory integration | `AgentCoreShortTermMemoryRepositoryAutoConfiguration.java`, `AgentCoreLongTermMemoryAutoConfiguration.java` |
+| `browser` | Browser automation tools | `AgentCoreBrowserAutoConfiguration.java` |
+| `codeinterpreter` | Code execution tools | `AgentCoreCodeInterpreterAutoConfiguration.java` |
+
+### Artifact Store Classes
+
+| Class | Purpose |
+|-------|---------|
+| `ArtifactStore<T>` | Interface for session-scoped artifact storage with optional category support |
+| `ArtifactStoreFactory<T>` | Factory interface for creating artifact stores |
+| `CaffeineArtifactStore<T>` | Caffeine-backed implementation with TTL |
+| `CaffeineArtifactStoreFactory<T>` | Factory for creating CaffeineArtifactStore instances |
+| `GeneratedFile` | Immutable artifact record (mimeType, data, name, metadata) |
+| `ArtifactMetadata` | Utility for metadata extraction |
+| `SessionConstants` | Session ID constants |
 
 ### Memory Module Classes
 

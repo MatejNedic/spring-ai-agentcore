@@ -18,6 +18,9 @@ package org.springaicommunity.agentcore.browser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import reactor.util.context.ContextView;
 
@@ -34,10 +37,9 @@ public class BrowserTools {
 	private static final Logger logger = LoggerFactory.getLogger(BrowserTools.class);
 
 	/**
-	 * Reactor context key for session ID. Callers should store session ID under this key
-	 * via `.contextWrite(ctx -> ctx.put(SESSION_ID_CONTEXT_KEY, sessionId))`.
+	 * Category used when storing artifacts. Use this when retrieving from shared store.
 	 */
-	public static final String SESSION_ID_CONTEXT_KEY = "sessionId";
+	public static final String CATEGORY = "browser";
 
 	public static final String BROWSE_URL_DESCRIPTION = """
 			Browse a web page and extract its text content.
@@ -65,16 +67,38 @@ public class BrowserTools {
 
 	private final BrowserClient client;
 
-	private final BrowserScreenshotStore screenshotStore;
+	private final ArtifactStore<GeneratedFile> artifactStore;
 
 	private final AgentCoreBrowserConfiguration config;
 
-	public BrowserTools(BrowserClient client, BrowserScreenshotStore screenshotStore,
+	private final String category;
+
+	/**
+	 * Create BrowserTools with default category (artifacts stored without category).
+	 * @param client the browser client
+	 * @param artifactStore the artifact store
+	 * @param config the browser configuration
+	 */
+	public BrowserTools(BrowserClient client, ArtifactStore<GeneratedFile> artifactStore,
 			AgentCoreBrowserConfiguration config) {
+		this(client, artifactStore, config, null);
+	}
+
+	/**
+	 * Create BrowserTools with explicit category for artifact storage.
+	 * @param client the browser client
+	 * @param artifactStore the artifact store
+	 * @param config the browser configuration
+	 * @param category the category for storing artifacts (null for default category)
+	 */
+	public BrowserTools(BrowserClient client, ArtifactStore<GeneratedFile> artifactStore,
+			AgentCoreBrowserConfiguration config, String category) {
 		this.client = client;
-		this.screenshotStore = screenshotStore;
+		this.artifactStore = artifactStore;
 		this.config = config;
-		logger.debug("BrowserTools initialized");
+		this.category = category;
+		logger.debug("BrowserTools initialized with category: {}",
+				category != null ? category : ArtifactStore.DEFAULT_CATEGORY);
 	}
 
 	/**
@@ -107,15 +131,17 @@ public class BrowserTools {
 			// Get session ID from Reactor context (available via
 			// ToolCallReactiveContextHolder)
 			ContextView ctx = ToolCallReactiveContextHolder.getContext();
-			String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, BrowserScreenshotStore.DEFAULT_SESSION_ID);
-			if (sessionId == null || sessionId.isBlank()) {
-				sessionId = BrowserScreenshotStore.DEFAULT_SESSION_ID;
-			}
+			String sessionId = ctx.getOrDefault(SessionConstants.SESSION_ID_KEY, SessionConstants.DEFAULT_SESSION_ID);
 
-			// Store screenshot
-			BrowserScreenshot screenshot = new BrowserScreenshot(screenshotBytes, url, config.viewportWidth(),
+			// Store screenshot as GeneratedFile with metadata
+			GeneratedFile screenshot = BrowserArtifacts.screenshot(screenshotBytes, url, config.viewportWidth(),
 					config.viewportHeight());
-			screenshotStore.store(sessionId, screenshot);
+			if (category != null) {
+				artifactStore.store(sessionId, category, screenshot);
+			}
+			else {
+				artifactStore.store(sessionId, screenshot);
+			}
 
 			logger.debug("Screenshot stored for session {}: {} bytes", sessionId, screenshotBytes.length);
 

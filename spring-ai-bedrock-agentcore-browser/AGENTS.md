@@ -48,9 +48,8 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 | `AgentCoreBrowserClient` | Remote implementation with SigV4 WebSocket signing |
 | `LocalBrowserClient` | Local implementation using Playwright Chromium launch |
 | `AgentCoreBrowserConfiguration` | Config properties with default constants |
-| `BrowserTools` | Tool implementation with Reactor context session handling |
-| `BrowserScreenshotStore` | Session-scoped screenshot storage with Caffeine cache |
-| `BrowserScreenshot` | Record for screenshot data with defensive copy |
+| `BrowserTools` | Tool implementation with Reactor context session handling and optional category |
+| `BrowserArtifacts` | Helper for creating screenshots with metadata |
 | `PageContentFormatter` | Package-private utility for formatting extracted page content |
 | `BrowserOperationException` | Exception for browser failures |
 | `BrowseUrlRequest`, `ScreenshotRequest`, etc. | Input schema records for tools |
@@ -61,11 +60,11 @@ Spring AI integration with Amazon Bedrock AgentCore Browser. Provides headless b
 2. **Playwright over CDP** - Uses Playwright's `connectOverCDP()` for remote browser control
 3. **SigV4 WebSocket signing** - AWS authentication for secure WebSocket connection
 4. **Ephemeral sessions** - Each tool call creates/destroys a session
-5. **Screenshot store** - Screenshots stored in Caffeine cache, appended to response after stream
+5. **Artifact store** - Screenshots stored in shared `ArtifactStore<GeneratedFile>` with optional category support
 6. **Lazy Playwright init** - Playwright managed as Spring `@Bean` with `destroyMethod="close"`; lazy in agentcore mode, eager in local mode
 7. **BrowserClient interface** - Abstracts browser operations; `AgentCoreBrowserClient` for remote, `LocalBrowserClient` for local dev
 8. **Mode-based auto-configuration** - `@ConditionalOnProperty` switches between agentcore and local implementations
-9. **Thread-safe screenshot store** - Uses `CopyOnWriteArrayList` for concurrent access
+9. **Thread-safe artifact store** - Uses Caffeine cache for concurrent access
 10. **Consistent error handling** - All tools return "Error: ..." strings on failure
 11. **Reactor context for session ID** - Session ID passed via `ToolCallReactiveContextHolder`, not `ToolContext`, to avoid leaking metadata to MCP tools
 12. **Shared content formatting** - `PageContentFormatter` extracts title + body text + truncation logic, shared by both `BrowserClient` implementations
@@ -94,7 +93,7 @@ String sessionId = ctx.getOrDefault(SESSION_ID_CONTEXT_KEY, DEFAULT_SESSION_ID);
 4. BrowserTools.takeScreenshot():
    a. Read sessionId from ToolCallReactiveContextHolder
    b. client.screenshotBytes(url) → PNG bytes
-   c. screenshotStore.store(sessionId, screenshot)
+   c. artifactStore.store(sessionId, screenshot)
    d. Return metadata to LLM: "Screenshot captured: 16752 bytes, 1456x819"
 5. Memory stores: user message + LLM response (NO screenshot bytes)
 6. ChatService.appendScreenshots(sessionId)

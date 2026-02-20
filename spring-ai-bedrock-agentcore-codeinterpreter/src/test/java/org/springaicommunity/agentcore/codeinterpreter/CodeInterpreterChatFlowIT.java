@@ -23,6 +23,10 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.CaffeineArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.bedrock.converse.BedrockProxyChatModel;
 import org.springframework.ai.chat.client.ChatClient;
@@ -30,6 +34,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
@@ -55,7 +60,8 @@ class CodeInterpreterChatFlowIT {
 	private CodeInterpreterTools tools;
 
 	@Autowired
-	private CodeInterpreterFileStore fileStore;
+	@Qualifier("codeInterpreterArtifactStore")
+	private ArtifactStore<GeneratedFile> artifactStore;
 
 	@Test
 	@DisplayName("Should propagate session ID through ChatClient streaming flow")
@@ -79,7 +85,7 @@ class CodeInterpreterChatFlowIT {
 			.user("Execute this Python code: print(2 + 2)")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, sessionId))
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, sessionId))
 			.collectList()
 			.map(chunks -> String.join("", chunks))
 			.block();
@@ -112,18 +118,19 @@ class CodeInterpreterChatFlowIT {
 			.user("Create a simple bar chart with matplotlib showing values A=10, B=20. Save it as chart.png")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, sessionId));
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, sessionId));
 
 		String response = responseFlux.collectList().map(chunks -> String.join("", chunks)).block();
 
 		assertThat(response).isNotNull();
 
 		// Verify files were stored under the correct session ID
-		if (fileStore.hasFiles(sessionId)) {
-			List<GeneratedFile> files = fileStore.retrieve(sessionId);
-			assertThat(files).isNotEmpty();
-			assertThat(files.stream().anyMatch(GeneratedFile::isImage)).isTrue();
-		}
+		assertThat(artifactStore.hasArtifacts(sessionId))
+			.as("Expected artifacts to be stored for session %s", sessionId)
+			.isTrue();
+		List<GeneratedFile> files = artifactStore.retrieve(sessionId);
+		assertThat(files).isNotEmpty();
+		assertThat(files.stream().anyMatch(GeneratedFile::isImage)).isTrue();
 	}
 
 	@Test
@@ -148,7 +155,7 @@ class CodeInterpreterChatFlowIT {
 			.user("Execute: import matplotlib.pyplot as plt; plt.figure(); plt.bar(['A'], [10]); plt.savefig('chart1.png'); print('done1')")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, session1))
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, session1))
 			.collectList()
 			.block();
 
@@ -157,22 +164,20 @@ class CodeInterpreterChatFlowIT {
 			.user("Execute: import matplotlib.pyplot as plt; plt.figure(); plt.bar(['B'], [20]); plt.savefig('chart2.png'); print('done2')")
 			.stream()
 			.content()
-			.contextWrite(ctx -> ctx.put(CodeInterpreterTools.SESSION_ID_CONTEXT_KEY, session2))
+			.contextWrite(ctx -> ctx.put(SessionConstants.SESSION_ID_KEY, session2))
 			.collectList()
 			.block();
 
 		// Verify session isolation
-		if (fileStore.hasFiles(session1)) {
-			List<GeneratedFile> files1 = fileStore.retrieve(session1);
-			assertThat(files1.stream().anyMatch(f -> f.name().contains("chart1"))).isTrue();
-			assertThat(files1.stream().noneMatch(f -> f.name().contains("chart2"))).isTrue();
-		}
+		assertThat(artifactStore.hasArtifacts(session1)).as("Expected artifacts to be stored for session1").isTrue();
+		List<GeneratedFile> files1 = artifactStore.retrieve(session1);
+		assertThat(files1.stream().anyMatch(f -> f.name().contains("chart1"))).isTrue();
+		assertThat(files1.stream().noneMatch(f -> f.name().contains("chart2"))).isTrue();
 
-		if (fileStore.hasFiles(session2)) {
-			List<GeneratedFile> files2 = fileStore.retrieve(session2);
-			assertThat(files2.stream().anyMatch(f -> f.name().contains("chart2"))).isTrue();
-			assertThat(files2.stream().noneMatch(f -> f.name().contains("chart1"))).isTrue();
-		}
+		assertThat(artifactStore.hasArtifacts(session2)).as("Expected artifacts to be stored for session2").isTrue();
+		List<GeneratedFile> files2 = artifactStore.retrieve(session2);
+		assertThat(files2.stream().anyMatch(f -> f.name().contains("chart2"))).isTrue();
+		assertThat(files2.stream().noneMatch(f -> f.name().contains("chart1"))).isTrue();
 	}
 
 	@SpringBootApplication(exclude = {
@@ -199,7 +204,7 @@ class CodeInterpreterChatFlowIT {
 
 		@Bean
 		AgentCoreCodeInterpreterConfiguration codeInterpreterConfiguration() {
-			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null);
+			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null, null);
 		}
 
 		@Bean
@@ -209,14 +214,14 @@ class CodeInterpreterChatFlowIT {
 		}
 
 		@Bean
-		CodeInterpreterFileStore codeInterpreterFileStore() {
-			return new CodeInterpreterFileStore(300);
+		ArtifactStore<GeneratedFile> codeInterpreterArtifactStore() {
+			return new CaffeineArtifactStore<>(300, "CodeInterpreterArtifactStore");
 		}
 
 		@Bean
 		CodeInterpreterTools codeInterpreterTools(AgentCoreCodeInterpreterClient client,
-				CodeInterpreterFileStore fileStore) {
-			return new CodeInterpreterTools(client, fileStore);
+				ArtifactStore<GeneratedFile> artifactStore) {
+			return new CodeInterpreterTools(client, artifactStore);
 		}
 
 	}

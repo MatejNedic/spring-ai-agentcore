@@ -23,8 +23,12 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import reactor.util.context.Context;
@@ -45,7 +49,8 @@ class LocalBrowserToolsIT {
 	private BrowserClient client;
 
 	@Autowired
-	private BrowserScreenshotStore screenshotStore;
+	@Qualifier("browserArtifactStore")
+	private ArtifactStore<GeneratedFile> artifactStore;
 
 	@Autowired
 	private BrowserTools tools;
@@ -65,17 +70,17 @@ class LocalBrowserToolsIT {
 	@DisplayName("Should store screenshot under session ID via BrowserTools")
 	void shouldStoreScreenshotUnderSessionId() {
 		String sessionId = "local-wiring-session";
-		ToolCallReactiveContextHolder.setContext(Context.of(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId));
+		ToolCallReactiveContextHolder.setContext(Context.of(SessionConstants.SESSION_ID_KEY, sessionId));
 
 		String result = tools.takeScreenshot("https://example.com");
 
 		assertThat(result).contains("Screenshot captured:");
-		assertThat(screenshotStore.hasScreenshots(sessionId)).isTrue();
+		assertThat(artifactStore.hasArtifacts(sessionId)).isTrue();
 
-		List<BrowserScreenshot> screenshots = screenshotStore.retrieve(sessionId);
+		List<GeneratedFile> screenshots = artifactStore.retrieve(sessionId);
 		assertThat(screenshots).hasSize(1);
-		assertThat(screenshots.get(0).url()).isEqualTo("https://example.com");
-		assertThat(screenshotStore.hasScreenshots(sessionId)).isFalse();
+		assertThat(screenshots.get(0).isImage()).isTrue();
+		assertThat(artifactStore.hasArtifacts(sessionId)).isFalse();
 	}
 
 	@SpringBootApplication

@@ -12,6 +12,7 @@
     <url>https://github.com/spring-ai-community/spring-ai-bedrock-agentcore</url>
     <modules>
         <module>spring-ai-bedrock-agentcore-bom</module>
+        <module>spring-ai-bedrock-agentcore-artifact-store</module>
         <module>spring-ai-bedrock-agentcore-runtime-starter</module>
         <module>spring-ai-bedrock-agentcore-memory</module>
         <module>spring-ai-bedrock-agentcore-codeinterpreter</module>

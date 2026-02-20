@@ -16,6 +16,7 @@
 
 package org.springaicommunity.agentcore.browser;
 
+import org.springaicommunity.agentcore.artifacts.ArtifactStoreFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -29,6 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param viewportHeight browser viewport height in pixels (default 819)
  * @param maxContentLength maximum content length before truncation (default 10000)
  * @param screenshotTtlSeconds TTL for cached screenshots in seconds (default 300)
+ * @param artifactStoreMaxSize maximum sessions in artifact store (default 10000)
  * @param browseUrlDescription custom description for browseUrl tool (optional)
  * @param screenshotDescription custom description for takeScreenshot tool (optional)
  * @param clickDescription custom description for clickElement tool (optional)
@@ -39,8 +41,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "agentcore.browser")
 public record AgentCoreBrowserConfiguration(String mode, Integer sessionTimeoutSeconds, String browserIdentifier,
 		Integer viewportWidth, Integer viewportHeight, Integer maxContentLength, Integer screenshotTtlSeconds,
-		String browseUrlDescription, String screenshotDescription, String clickDescription, String fillDescription,
-		String evaluateDescription) {
+		Integer artifactStoreMaxSize, String browseUrlDescription, String screenshotDescription,
+		String clickDescription, String fillDescription, String evaluateDescription) {
 
 	/** Default browser mode. */
 	public static final String DEFAULT_MODE = "agentcore";
@@ -87,6 +89,9 @@ public record AgentCoreBrowserConfiguration(String mode, Integer sessionTimeoutS
 		}
 		if (screenshotTtlSeconds == null || screenshotTtlSeconds <= 0) {
 			screenshotTtlSeconds = DEFAULT_SCREENSHOT_TTL_SECONDS;
+		}
+		if (artifactStoreMaxSize == null || artifactStoreMaxSize <= 0) {
+			artifactStoreMaxSize = ArtifactStoreFactory.DEFAULT_MAX_SIZE;
 		}
 		// Tool descriptions can be null - will use defaults from BrowserTools
 	}

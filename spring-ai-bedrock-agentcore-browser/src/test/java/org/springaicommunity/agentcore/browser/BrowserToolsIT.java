@@ -28,6 +28,10 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springaicommunity.agentcore.artifacts.ArtifactStore;
+import org.springaicommunity.agentcore.artifacts.CaffeineArtifactStore;
+import org.springaicommunity.agentcore.artifacts.GeneratedFile;
+import org.springaicommunity.agentcore.artifacts.SessionConstants;
 import org.springframework.ai.model.tool.internal.ToolCallReactiveContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -52,13 +56,13 @@ class BrowserToolsIT {
 	@Autowired
 	private AgentCoreBrowserConfiguration config;
 
-	private BrowserScreenshotStore store;
+	private ArtifactStore<GeneratedFile> store;
 
 	private BrowserTools tools;
 
 	@BeforeEach
 	void setUp() {
-		store = new BrowserScreenshotStore(300);
+		store = new CaffeineArtifactStore<>(300, "BrowserArtifactStore");
 		tools = new BrowserTools(client, store, config);
 	}
 
@@ -68,7 +72,7 @@ class BrowserToolsIT {
 	}
 
 	private void setSessionId(String sessionId) {
-		Context ctx = sessionId != null ? Context.of(BrowserTools.SESSION_ID_CONTEXT_KEY, sessionId) : Context.empty();
+		Context ctx = sessionId != null ? Context.of(SessionConstants.SESSION_ID_KEY, sessionId) : Context.empty();
 		ToolCallReactiveContextHolder.setContext(ctx);
 	}
 
@@ -78,10 +82,10 @@ class BrowserToolsIT {
 	@Order(1)
 	@DisplayName("Should browse URL and return content")
 	void shouldBrowseUrlAndReturnContent() {
-		String result = tools.browseUrl("https://example.com");
+		String result = tools.browseUrl("https://docs.aws.amazon.com");
 
 		assertThat(result).contains("Title:");
-		assertThat(result).containsIgnoringCase("example");
+		assertThat(result).containsIgnoringCase("aws");
 	}
 
 	@Test
@@ -101,11 +105,11 @@ class BrowserToolsIT {
 	void shouldTakeScreenshotAndStoreBySessionId() {
 		setSessionId("session-A");
 
-		String result = tools.takeScreenshot("https://example.com");
+		String result = tools.takeScreenshot("https://docs.aws.amazon.com");
 
 		assertThat(result).contains("Screenshot captured:");
 		assertThat(result).contains("bytes");
-		assertThat(store.hasScreenshots("session-A")).isTrue();
+		assertThat(store.hasArtifacts("session-A")).isTrue();
 	}
 
 	@Test
@@ -114,10 +118,10 @@ class BrowserToolsIT {
 	void shouldTakeScreenshotUseDefaultSessionWhenNull() {
 		setSessionId(null);
 
-		String result = tools.takeScreenshot("https://example.com");
+		String result = tools.takeScreenshot("https://docs.aws.amazon.com");
 
 		assertThat(result).contains("Screenshot captured:");
-		assertThat(store.hasScreenshots(BrowserScreenshotStore.DEFAULT_SESSION_ID)).isTrue();
+		assertThat(store.hasArtifacts(SessionConstants.DEFAULT_SESSION_ID)).isTrue();
 	}
 
 	@Test
@@ -136,18 +140,18 @@ class BrowserToolsIT {
 	@DisplayName("Should retrieve screenshot only from own session")
 	void shouldRetrieveScreenshotOnlyFromOwnSession() {
 		setSessionId("session-X");
-		tools.takeScreenshot("https://example.com");
+		tools.takeScreenshot("https://docs.aws.amazon.com");
 
 		setSessionId("session-Y");
-		tools.takeScreenshot("https://example.com");
+		tools.takeScreenshot("https://docs.aws.amazon.com");
 
-		List<BrowserScreenshot> xScreenshots = store.retrieve("session-X");
-		List<BrowserScreenshot> yScreenshots = store.retrieve("session-Y");
+		List<GeneratedFile> xScreenshots = store.retrieve("session-X");
+		List<GeneratedFile> yScreenshots = store.retrieve("session-Y");
 
 		assertThat(xScreenshots).hasSize(1);
 		assertThat(yScreenshots).hasSize(1);
-		assertThat(store.hasScreenshots("session-X")).isFalse();
-		assertThat(store.hasScreenshots("session-Y")).isFalse();
+		assertThat(store.hasArtifacts("session-X")).isFalse();
+		assertThat(store.hasArtifacts("session-Y")).isFalse();
 	}
 
 	@Test
@@ -155,24 +159,24 @@ class BrowserToolsIT {
 	@DisplayName("Should clear screenshots after retrieve")
 	void shouldClearScreenshotsAfterRetrieve() {
 		setSessionId("session-clear");
-		tools.takeScreenshot("https://example.com");
+		tools.takeScreenshot("https://docs.aws.amazon.com");
 
-		assertThat(store.hasScreenshots("session-clear")).isTrue();
+		assertThat(store.hasArtifacts("session-clear")).isTrue();
 		store.retrieve("session-clear");
-		assertThat(store.hasScreenshots("session-clear")).isFalse();
+		assertThat(store.hasArtifacts("session-clear")).isFalse();
 		assertThat(store.retrieve("session-clear")).isNull();
 	}
 
 	@Test
 	@Order(8)
-	@DisplayName("Should hasScreenshots return correctly")
-	void shouldHasScreenshotsReturnCorrectly() {
-		assertThat(store.hasScreenshots("nonexistent")).isFalse();
+	@DisplayName("Should hasArtifacts return correctly")
+	void shouldHasArtifactsReturnCorrectly() {
+		assertThat(store.hasArtifacts("nonexistent")).isFalse();
 
 		setSessionId("session-has");
-		tools.takeScreenshot("https://example.com");
+		tools.takeScreenshot("https://docs.aws.amazon.com");
 
-		assertThat(store.hasScreenshots("session-has")).isTrue();
+		assertThat(store.hasArtifacts("session-has")).isTrue();
 	}
 
 	@Test
@@ -180,12 +184,12 @@ class BrowserToolsIT {
 	@DisplayName("Should screenshot toDataUrl return valid format")
 	void shouldScreenshotToDataUrlReturnValidFormat() {
 		setSessionId("session-dataurl");
-		tools.takeScreenshot("https://example.com");
+		tools.takeScreenshot("https://docs.aws.amazon.com");
 
-		List<BrowserScreenshot> screenshots = store.retrieve("session-dataurl");
+		List<GeneratedFile> screenshots = store.retrieve("session-dataurl");
 		assertThat(screenshots).hasSize(1);
 
-		BrowserScreenshot screenshot = screenshots.get(0);
+		GeneratedFile screenshot = screenshots.get(0);
 		String dataUrl = screenshot.toDataUrl();
 
 		assertThat(dataUrl).startsWith("data:image/png;base64,");
@@ -199,7 +203,8 @@ class BrowserToolsIT {
 	@Order(10)
 	@DisplayName("Should click element")
 	void shouldClickElement() {
-		String result = tools.clickElement("https://example.com", "a");
+		// Use httpbin which has a simple, reliable link structure
+		String result = tools.clickElement("https://httpbin.org", "a[href='/forms/post']");
 
 		assertThat(result).containsIgnoringCase("clicked");
 	}
@@ -239,9 +244,9 @@ class BrowserToolsIT {
 	@Order(14)
 	@DisplayName("Should evaluate script")
 	void shouldEvaluateScript() {
-		String result = tools.evaluateScript("https://example.com", "document.title");
+		String result = tools.evaluateScript("https://docs.aws.amazon.com", "document.title");
 
-		assertThat(result).containsIgnoringCase("example");
+		assertThat(result).containsIgnoringCase("aws");
 	}
 
 	@Test
@@ -259,39 +264,37 @@ class BrowserToolsIT {
 	@Order(16)
 	@DisplayName("Should isolate screenshots between concurrent sessions using shared store")
 	void shouldIsolateScreenshotsBetweenParallelSessions() {
-		BrowserScreenshotStore sharedStore = new BrowserScreenshotStore(300);
+		ArtifactStore<GeneratedFile> sharedStore = new CaffeineArtifactStore<>(300, "SharedBrowserArtifactStore");
 
 		// Session 1: takes screenshot
-		ToolCallReactiveContextHolder
-			.setContext(Context.of(BrowserTools.SESSION_ID_CONTEXT_KEY, "concurrent-session-1"));
+		ToolCallReactiveContextHolder.setContext(Context.of(SessionConstants.SESSION_ID_KEY, "concurrent-session-1"));
 		BrowserTools tools1 = new BrowserTools(client, sharedStore, config);
-		tools1.takeScreenshot("https://example.com");
+		tools1.takeScreenshot("https://docs.aws.amazon.com");
 		ToolCallReactiveContextHolder.clearContext();
 
 		// Session 2: takes screenshot (before session 1 retrieves)
-		ToolCallReactiveContextHolder
-			.setContext(Context.of(BrowserTools.SESSION_ID_CONTEXT_KEY, "concurrent-session-2"));
+		ToolCallReactiveContextHolder.setContext(Context.of(SessionConstants.SESSION_ID_KEY, "concurrent-session-2"));
 		BrowserTools tools2 = new BrowserTools(client, sharedStore, config);
-		tools2.takeScreenshot("https://docs.aws.amazon.com");
+		tools2.takeScreenshot("https://aws.amazon.com");
 		ToolCallReactiveContextHolder.clearContext();
 
 		// Both sessions have screenshots in shared store
-		assertThat(sharedStore.hasScreenshots("concurrent-session-1")).isTrue();
-		assertThat(sharedStore.hasScreenshots("concurrent-session-2")).isTrue();
+		assertThat(sharedStore.hasArtifacts("concurrent-session-1")).isTrue();
+		assertThat(sharedStore.hasArtifacts("concurrent-session-2")).isTrue();
 
 		// Session 1 retrieves - should only get its own
-		List<BrowserScreenshot> session1Screenshots = sharedStore.retrieve("concurrent-session-1");
+		List<GeneratedFile> session1Screenshots = sharedStore.retrieve("concurrent-session-1");
 		assertThat(session1Screenshots).hasSize(1);
-		assertThat(session1Screenshots.get(0).url()).isEqualTo("https://example.com");
+		assertThat(session1Screenshots.get(0).isImage()).isTrue();
 
 		// Session 2 retrieves - should only get its own
-		List<BrowserScreenshot> session2Screenshots = sharedStore.retrieve("concurrent-session-2");
+		List<GeneratedFile> session2Screenshots = sharedStore.retrieve("concurrent-session-2");
 		assertThat(session2Screenshots).hasSize(1);
-		assertThat(session2Screenshots.get(0).url()).isEqualTo("https://docs.aws.amazon.com");
+		assertThat(session2Screenshots.get(0).isImage()).isTrue();
 
 		// Store is empty for both
-		assertThat(sharedStore.hasScreenshots("concurrent-session-1")).isFalse();
-		assertThat(sharedStore.hasScreenshots("concurrent-session-2")).isFalse();
+		assertThat(sharedStore.hasArtifacts("concurrent-session-1")).isFalse();
+		assertThat(sharedStore.hasArtifacts("concurrent-session-2")).isFalse();
 	}
 
 	@SpringBootApplication

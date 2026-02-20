@@ -11,12 +11,15 @@ A Spring Boot starter that enables existing Spring Boot applications to conform 
 - **Async task tracking**: Convenient methods for background task tracking
 - **Rate limiting**: Built-in Bucket4j throttling for invocations and ping endpoints
 - **AgentCore Memory integration**: Spring AI integration with Amazon Bedrock AgentCore Memory service
+- **Browser automation**: Headless browser tools for web navigation, screenshots, and page interaction
+- **Code interpreter**: Execute Python, JavaScript, and TypeScript code in a secure sandbox
 
 ## Examples
 
 See the `examples/` directory for complete working examples:
 
 - **`simple-spring-boot-app/`** - Minimal AgentCore agent with async task tracking
+- **`spring-ai-browser/`** - Browser automation with screenshots and content extraction
 - **`spring-ai-sse-chat-client/`** - SSE streaming with Spring AI and Amazon Bedrock
 - **`spring-ai-simple-chat-client/`** - Traditional Spring AI integration (without AgentCore starter)
 - **`spring-ai-override-invocations/`** - Custom controller override using marker interfaces
@@ -28,11 +31,24 @@ See the `examples/` directory for complete working examples:
 ### 1. Add Dependency
 
 ```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-bedrock-agentcore-runtime-starter</artifactId>
-    <version>1.0.0-RC2</version>
-</dependency>
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>spring-ai-bedrock-agentcore-bom</artifactId>
+            <version>${version}</version>  <!-- Use latest: 1.0.0-RC2, 1.0.0-RC3, etc. -->
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-bedrock-agentcore-runtime-starter</artifactId>
+    </dependency>
+</dependencies>
 ```
 
 ### 2. Create Agent Method
@@ -269,7 +285,6 @@ The `spring-ai-bedrock-agentcore-memory` module provides Spring AI ChatMemory in
 <dependency>
     <groupId>org.springaicommunity</groupId>
     <artifactId>spring-ai-bedrock-agentcore-memory</artifactId>
-    <version>1.0.0-RC2</version>
 </dependency>
 ```
 
@@ -371,6 +386,80 @@ public class ChatService {
 The `AgentCoreMemory` bean is auto-configured when you set the required properties.
 
 For detailed configuration options and API reference, see [spring-ai-bedrock-agentcore-memory/README.md](spring-ai-bedrock-agentcore-memory/README.md).
+
+## Browser Automation
+
+The `spring-ai-bedrock-agentcore-browser` module provides headless browser tools for web navigation, content extraction, screenshots, and page interaction using Playwright over CDP.
+
+### Add Dependency
+
+```xml
+<dependency>
+    <groupId>org.springaicommunity</groupId>
+    <artifactId>spring-ai-bedrock-agentcore-browser</artifactId>
+</dependency>
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `browseUrl` | Navigate to URL and extract page content |
+| `takeScreenshot` | Capture screenshot (stored in artifact cache) |
+| `clickElement` | Click element by CSS selector |
+| `fillForm` | Fill form field by selector |
+| `evaluateScript` | Execute JavaScript on page |
+
+### Modes
+
+- **agentcore** (default): Uses AgentCore Browser managed service
+- **local**: Uses locally launched Chromium for development
+
+```properties
+agentcore.browser.mode=local  # for local development
+```
+
+For detailed configuration and usage, see [spring-ai-bedrock-agentcore-browser/README.md](spring-ai-bedrock-agentcore-browser/README.md).
+
+## Code Interpreter
+
+The `spring-ai-bedrock-agentcore-codeinterpreter` module provides secure code execution in Python, JavaScript, and TypeScript with automatic file retrieval.
+
+### Add Dependency
+
+```xml
+<dependency>
+    <groupId>org.springaicommunity</groupId>
+    <artifactId>spring-ai-bedrock-agentcore-codeinterpreter</artifactId>
+</dependency>
+```
+
+### Features
+
+- Execute code in Python, JavaScript, or TypeScript
+- Pre-installed libraries: numpy, pandas, matplotlib (Python)
+- Automatic file retrieval (charts, CSVs, PDFs)
+- Session-scoped artifact storage
+
+For detailed configuration and usage, see [spring-ai-bedrock-agentcore-codeinterpreter/README.md](spring-ai-bedrock-agentcore-codeinterpreter/README.md).
+
+## Artifact Store
+
+Both browser and code interpreter modules use the shared `spring-ai-bedrock-agentcore-artifact-store` module for session-scoped artifact storage. The store provides:
+
+- Thread-safe multi-session support
+- TTL-based automatic cleanup
+- Configurable max size per module
+
+```java
+// Inject artifact store
+@Qualifier("browserArtifactStore") ArtifactStore<GeneratedFile> browserArtifacts
+@Qualifier("codeInterpreterArtifactStore") ArtifactStore<GeneratedFile> codeArtifacts
+
+// Store and retrieve artifacts
+artifactStore.store(sessionId, generatedFile);
+List<GeneratedFile> files = artifactStore.retrieve(sessionId);  // destructive read
+```
 
 ## Development
 
