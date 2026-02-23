@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.agentcore.memory.*;
+import org.springaicommunity.agentcore.memory.AgentCoreMemoryProperties;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryAdvisor.MemoryStrategy;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryStrategyDiscovery.DiscoveredStrategy;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryStrategyDiscovery.StrategyType;

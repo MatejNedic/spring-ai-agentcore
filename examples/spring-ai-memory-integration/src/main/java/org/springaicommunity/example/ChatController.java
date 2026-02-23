@@ -1,6 +1,6 @@
 package org.springaicommunity.example;
 
-import org.springaicommunity.agentcore.memory.*;
+import org.springaicommunity.agentcore.memory.longterm.AgentCoreMemory;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryProperties;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryRetriever;
 import org.springaicommunity.agentcore.memory.shorttem.AgentCoreShortTermMemoryRepository;

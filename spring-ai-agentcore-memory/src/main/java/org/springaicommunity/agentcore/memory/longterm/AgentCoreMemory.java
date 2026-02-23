@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.memory;
+package org.springaicommunity.agentcore.memory.longterm;
 
-import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 
