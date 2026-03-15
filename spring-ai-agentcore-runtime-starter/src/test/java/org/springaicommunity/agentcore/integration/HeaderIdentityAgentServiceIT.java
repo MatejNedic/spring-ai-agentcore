@@ -18,12 +18,9 @@ package org.springaicommunity.agentcore.integration;
 
 import java.util.Base64;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 import org.springaicommunity.agentcore.identity.JwtAgentCorePrincipal;
-import org.springaicommunity.agentcore.identity.providers.AgentCorePrincipalProvider;
-import org.springaicommunity.agentcore.identity.providers.HeaderAgentCorePrincipalProvider;
 import org.springaicommunity.agentcore.identity.template.AgentCoreIdentityTemplate;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,13 +88,6 @@ class HeaderIdentityAgentServiceIT {
 			AgentCoreIdentityTemplate mock = mock(AgentCoreIdentityTemplate.class);
 			when(mock.getWorkloadAccessToken(anyString(), anyString())).thenReturn("mock-workload-token");
 			return mock;
-		}
-
-		// Have to be like this since dependency is on path and autoconfiguration fails.
-		@Bean
-		@Primary
-		AgentCorePrincipalProvider agentCorePrincipalProvider(ObjectMapper objectMapper) {
-			return new HeaderAgentCorePrincipalProvider(objectMapper);
 		}
 
 	}
