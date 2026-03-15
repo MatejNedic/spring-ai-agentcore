@@ -18,12 +18,16 @@ package org.springaicommunity.agentcore.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.autoconfigure.AgentCoreAutoConfiguration;
+import org.springaicommunity.agentcore.autoconfigure.AgentCorePingAutoConfiguration;
+import org.springaicommunity.agentcore.autoconfigure.AwsCredentialsAndRegionAutoConfiguration;
 import org.springaicommunity.agentcore.model.AgentCorePingResponse;
 import org.springaicommunity.agentcore.model.PingStatus;
 import org.springaicommunity.agentcore.ping.AgentCorePingService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -35,8 +39,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = { AgentCorePingController.class })
-@Import({ AgentCoreAutoConfiguration.class, AgentCorePingControllerTest.TestConfig.class })
+@WebMvcTest(controllers = { AgentCorePingController.class },
+		excludeAutoConfiguration = { SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class })
+@Import({ AgentCoreAutoConfiguration.class, AgentCorePingAutoConfiguration.class,
+		AwsCredentialsAndRegionAutoConfiguration.class, AgentCorePingControllerTest.TestConfig.class })
 class AgentCorePingControllerTest {
 
 	@SpringBootApplication

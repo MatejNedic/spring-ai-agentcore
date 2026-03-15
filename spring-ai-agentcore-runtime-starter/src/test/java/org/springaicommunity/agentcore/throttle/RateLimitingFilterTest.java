@@ -16,15 +16,23 @@
 
 package org.springaicommunity.agentcore.throttle;
 
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,9 +44,21 @@ class RateLimitingFilterTest {
 	@LocalServerPort
 	private int port;
 
+	@Autowired
+	private FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration;
+
 	private final RestTemplate restTemplate = new RestTemplate();
 
-	@SpringBootApplication(scanBasePackages = "org.springaicommunity.agentcore.autoconfigure")
+	@BeforeEach
+	void clearBuckets() {
+		((ConcurrentHashMap<?, ?>) ReflectionTestUtils.getField(rateLimitingFilterRegistration.getFilter(), "buckets"))
+			.clear();
+	}
+
+	@SpringBootApplication(
+			scanBasePackages = { "org.springaicommunity.agentcore.autoconfigure",
+					"org.springaicommunity.agentcore.throttle" },
+			exclude = { SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class })
 	static class ContextTestApp {
 
 		@Service

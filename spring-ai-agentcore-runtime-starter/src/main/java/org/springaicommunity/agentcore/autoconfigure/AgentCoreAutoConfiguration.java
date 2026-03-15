@@ -128,9 +128,10 @@ public class AgentCoreAutoConfiguration {
 	}
 
 	@Configuration
-	@ConditionalOnClass(name = { "org.springframework.security.core.context.SecurityContextHolder",
-			"org.springframework.security.config.annotation.web.builders.HttpSecurity",
-			"org.springframework.security.web.SecurityFilterChain" })
+	@ConditionalOnClass(
+			name = { "org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken",
+					"org.springframework.security.config.annotation.web.builders.HttpSecurity",
+					"org.springframework.security.web.SecurityFilterChain" })
 	@ConditionalOnProperty(name = "spring.security.oauth2.resourceserver.jwt.jwk-set-uri")
 	static class SpringSecurityAgentCorePrincipalConfiguration {
 
@@ -160,7 +161,7 @@ public class AgentCoreAutoConfiguration {
 	}
 
 	@Configuration
-	@ConditionalOnMissingClass(value = "org.springframework.security.core.context.SecurityContextHolder")
+	@ConditionalOnMissingBean(AgentCorePrincipalProvider.class)
 	static class HeaderAgentCorePrincipalConfiguration {
 
 		@Bean

@@ -19,11 +19,16 @@ package org.springaicommunity.agentcore.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.autoconfigure.AgentCoreAutoConfiguration;
+import org.springaicommunity.agentcore.autoconfigure.AgentCorePingAutoConfiguration;
+import org.springaicommunity.agentcore.autoconfigure.AwsCredentialsAndRegionAutoConfiguration;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
+import org.springaicommunity.agentcore.ping.AgentCorePingService;
 import org.springaicommunity.agentcore.ping.AgentCoreTaskTracker;
 import org.springaicommunity.agentcore.service.AgentCoreMethodInvoker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -38,8 +43,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = { AgentCoreInvocationsController.class })
-@Import({ AgentCoreAutoConfiguration.class, AgentCoreInvocationsControllerTest.TestConfig.class })
+@WebMvcTest(controllers = { AgentCoreInvocationsController.class },
+		excludeAutoConfiguration = { SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class })
+@Import({ AgentCoreAutoConfiguration.class, AgentCorePingAutoConfiguration.class,
+		AwsCredentialsAndRegionAutoConfiguration.class, AgentCoreInvocationsControllerTest.TestConfig.class })
 class AgentCoreInvocationsControllerTest {
 
 	@Autowired
@@ -50,6 +57,9 @@ class AgentCoreInvocationsControllerTest {
 
 	@MockitoBean
 	private AgentCoreTaskTracker mockTaskTracker;
+
+	@MockitoBean
+	private AgentCorePingService mockPingService;
 
 	@Autowired
 	private ObjectMapper objectMapper;

@@ -34,7 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentCoreAutoConfigurationTest {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(AgentCoreAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(AgentCoreAutoConfiguration.class, AgentCorePingAutoConfiguration.class,
+				AwsCredentialsAndRegionAutoConfiguration.class))
+		.withPropertyValues("spring.agent-core.credentials.access-key=test",
+				"spring.agent-core.credentials.secret-key=test");
 
 	@Test
 	void shouldCreateAllBeansWhenAgentCoreInvocationIsPresent() {

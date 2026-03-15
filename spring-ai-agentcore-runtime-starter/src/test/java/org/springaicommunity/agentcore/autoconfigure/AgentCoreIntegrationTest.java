@@ -23,6 +23,8 @@ import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -35,7 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 		webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AgentCoreIntegrationTest {
 
-	@SpringBootApplication(scanBasePackages = "org.springaicommunity.agentcore.autoconfigure")
+	@SpringBootApplication(scanBasePackages = "org.springaicommunity.agentcore.autoconfigure",
+			exclude = { SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class })
 	static class TestApp {
 
 		@Service
