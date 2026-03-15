@@ -1,1 +1,3 @@
+org.springaicommunity.agentcore.autoconfigure.AwsCredentialsAndRegionAutoConfiguration
 org.springaicommunity.agentcore.autoconfigure.AgentCoreAutoConfiguration
+org.springaicommunity.agentcore.autoconfigure.AgentCorePingAutoConfiguration

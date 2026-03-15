@@ -21,7 +21,9 @@ import java.lang.reflect.InvocationTargetException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springaicommunity.agentcore.context.AgentCoreContext;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
+import org.springaicommunity.agentcore.identity.AgentCorePrincipal;
 
+import org.springaicommunity.agentcore.identity.providers.AgentCorePrincipalProvider;
 import org.springframework.http.HttpHeaders;
 
 public class AgentCoreMethodInvoker {
@@ -30,9 +32,13 @@ public class AgentCoreMethodInvoker {
 
 	private final AgentCoreMethodRegistry registry;
 
-	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry) {
+	private final AgentCorePrincipalProvider principalProvider;
+
+	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry,
+			AgentCorePrincipalProvider principalProvider) {
 		this.objectMapper = objectMapper;
 		this.registry = registry;
+		this.principalProvider = principalProvider;
 	}
 
 	public Object invokeAgentMethod(Object request, HttpHeaders headers) throws Exception {
@@ -67,54 +73,36 @@ public class AgentCoreMethodInvoker {
 			return new Object[0];
 		}
 
-		// Find AgentCoreContext parameter index
-		int contextIndex = -1;
+		AgentCoreContext context = new AgentCoreContext(headers);
+		Object[] args = new Object[paramTypes.length];
+		int requestIndex = -1;
+
 		for (int i = 0; i < paramTypes.length; i++) {
 			if (paramTypes[i] == AgentCoreContext.class) {
-				contextIndex = i;
-				break;
+				args[i] = context;
+			}
+			else if (AgentCorePrincipal.class.isAssignableFrom(paramTypes[i])) {
+				args[i] = this.principalProvider.resolve(context);
+			}
+			else {
+				if (requestIndex != -1) {
+					throw new AgentCoreInvocationException("Unsupported parameter combination");
+				}
+				requestIndex = i;
 			}
 		}
 
-		if (paramTypes.length == 1) {
-			Class<?> paramType = paramTypes[0];
-
-			// Handle AgentCoreContext parameter
-			if (paramType == AgentCoreContext.class) {
-				return new Object[] { new AgentCoreContext(headers) };
-			}
-
-			// Direct assignment if types match
-			if (paramType.isAssignableFrom(request.getClass())) {
-				return new Object[] { request };
-			}
-
-			// JSON conversion for complex types
-			return new Object[] { convertRequest(request, paramType) };
-		}
-
-		if (paramTypes.length == 2 && contextIndex != -1) {
-			Object[] args = new Object[2];
-
-			// Set context parameter
-			args[contextIndex] = new AgentCoreContext(headers);
-
-			// Set request parameter
-			int requestIndex = contextIndex == 0 ? 1 : 0;
+		if (requestIndex != -1) {
 			Class<?> requestType = paramTypes[requestIndex];
-
 			if (requestType.isAssignableFrom(request.getClass())) {
 				args[requestIndex] = request;
 			}
-
 			else {
 				args[requestIndex] = convertRequest(request, requestType);
 			}
-
-			return args;
 		}
 
-		throw new AgentCoreInvocationException("Unsupported parameter combination");
+		return args;
 	}
 
 	private Object convertRequest(Object request, Class<?> targetType) {

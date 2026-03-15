@@ -25,10 +25,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
+import org.springaicommunity.agentcore.context.AgentCoreContext;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
+import org.springaicommunity.agentcore.identity.JwtAgentCorePrincipal;
+import org.springaicommunity.agentcore.identity.providers.AgentCorePrincipalProvider;
+
+import org.springframework.http.HttpHeaders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,13 +46,16 @@ class AgentCoreMethodInvokerTest {
 	@Mock
 	private AgentCoreMethodRegistry mockRegistry;
 
+	@Mock
+	private AgentCorePrincipalProvider mockPrincipalProvider;
+
 	private AgentCoreMethodInvoker invoker;
 
 	private Object testRequest;
 
 	@BeforeEach
 	void setUp() {
-		invoker = new AgentCoreMethodInvoker(mockObjectMapper, mockRegistry);
+		invoker = new AgentCoreMethodInvoker(mockObjectMapper, mockRegistry, mockPrincipalProvider);
 		testRequest = "test prompt";
 	}
 
@@ -147,9 +156,8 @@ class AgentCoreMethodInvokerTest {
 	@Test
 	void shouldInjectAgentCoreContext() throws Exception {
 		var testBean = new TestBean();
-		var method = TestBean.class.getDeclaredMethod("contextMethod",
-				org.springaicommunity.agentcore.context.AgentCoreContext.class);
-		var headers = new org.springframework.http.HttpHeaders();
+		var method = TestBean.class.getDeclaredMethod("contextMethod", AgentCoreContext.class);
+		var headers = new HttpHeaders();
 		headers.add("test-header", "test-value");
 
 		when(mockRegistry.hasAgentMethod()).thenReturn(true);
@@ -164,9 +172,8 @@ class AgentCoreMethodInvokerTest {
 	@Test
 	void shouldInjectBothRequestAndContext() throws Exception {
 		var testBean = new TestBean();
-		var method = TestBean.class.getDeclaredMethod("requestAndContextMethod", String.class,
-				org.springaicommunity.agentcore.context.AgentCoreContext.class);
-		var headers = new org.springframework.http.HttpHeaders();
+		var method = TestBean.class.getDeclaredMethod("requestAndContextMethod", String.class, AgentCoreContext.class);
+		var headers = new HttpHeaders();
 		headers.add("session-id", "session-123");
 
 		when(mockRegistry.hasAgentMethod()).thenReturn(true);
@@ -176,6 +183,41 @@ class AgentCoreMethodInvokerTest {
 		var result = invoker.invokeAgentMethod(testRequest, headers);
 
 		assertThat(result).isEqualTo("Request: test prompt, Session: session-123");
+	}
+
+	@Test
+	void shouldInjectPrincipal() throws Exception {
+		var testBean = new TestBean();
+		var method = TestBean.class.getDeclaredMethod("principalMethod", JwtAgentCorePrincipal.class);
+		var principal = new JwtAgentCorePrincipal("token", Map.of("sub", "user-123"));
+
+		when(mockRegistry.hasAgentMethod()).thenReturn(true);
+		when(mockRegistry.getAgentMethod()).thenReturn(method);
+		when(mockRegistry.getAgentBean()).thenReturn(testBean);
+		when(mockPrincipalProvider.resolve(any(AgentCoreContext.class))).thenReturn(principal);
+
+		var result = invoker.invokeAgentMethod(testRequest);
+
+		assertThat(result).isEqualTo("Principal: user-123");
+	}
+
+	@Test
+	void shouldInjectRequestContextAndPrincipal() throws Exception {
+		var testBean = new TestBean();
+		var method = TestBean.class.getDeclaredMethod("allParamsMethod", String.class, AgentCoreContext.class,
+				JwtAgentCorePrincipal.class);
+		var headers = new HttpHeaders();
+		headers.add("session-id", "session-456");
+		var principal = new JwtAgentCorePrincipal("token", Map.of("sub", "user-789"));
+
+		when(mockRegistry.hasAgentMethod()).thenReturn(true);
+		when(mockRegistry.getAgentMethod()).thenReturn(method);
+		when(mockRegistry.getAgentBean()).thenReturn(testBean);
+		when(mockPrincipalProvider.resolve(any(AgentCoreContext.class))).thenReturn(principal);
+
+		var result = invoker.invokeAgentMethod(testRequest, headers);
+
+		assertThat(result).isEqualTo("All: test prompt, session-456, user-789");
 	}
 
 	static class TestBean {
@@ -211,14 +253,23 @@ class AgentCoreMethodInvokerTest {
 		}
 
 		@AgentCoreInvocation
-		public String contextMethod(org.springaicommunity.agentcore.context.AgentCoreContext context) {
+		public String contextMethod(AgentCoreContext context) {
 			return "Context response: " + context.getHeader("test-header");
 		}
 
 		@AgentCoreInvocation
-		public String requestAndContextMethod(String prompt,
-				org.springaicommunity.agentcore.context.AgentCoreContext context) {
+		public String requestAndContextMethod(String prompt, AgentCoreContext context) {
 			return "Request: " + prompt + ", Session: " + context.getHeader("session-id");
+		}
+
+		@AgentCoreInvocation
+		public String principalMethod(JwtAgentCorePrincipal principal) {
+			return "Principal: " + principal.getUserId();
+		}
+
+		@AgentCoreInvocation
+		public String allParamsMethod(String prompt, AgentCoreContext context, JwtAgentCorePrincipal principal) {
+			return "All: " + prompt + ", " + context.getHeader("session-id") + ", " + principal.getUserId();
 		}
 
 	}
