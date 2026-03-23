@@ -16,6 +16,11 @@
 
 package org.springaicommunity.agentcore.identity;
 
+import org.springaicommunity.agentcore.context.AgentCoreContext;
+import org.springaicommunity.agentcore.context.AgentCoreHeaders;
+
+import java.util.UUID;
+
 /**
  * Principal representing an authenticated user in AgentCore.
  *
@@ -34,5 +39,19 @@ public interface AgentCorePrincipal {
 	 * @return the JWT token value in string format
 	 */
 	String getJwt();
+
+	/**
+	 * Resolved conversationId from header and userId from token.
+	 * @param context which holds headers.
+	 * @return conversationId based on userId and sessionId from header
+	 */
+	default String resolveConversationId(AgentCoreContext context) {
+		String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
+		if (sessionId == null || sessionId.isBlank()) {
+			sessionId = UUID.randomUUID().toString();
+		}
+		String userId = getUserId();
+		return userId != null ? userId + ":" + sessionId : sessionId;
+	}
 
 }

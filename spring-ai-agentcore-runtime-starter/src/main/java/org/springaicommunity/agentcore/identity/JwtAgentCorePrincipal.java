@@ -68,15 +68,6 @@ public class JwtAgentCorePrincipal implements AgentCorePrincipal {
 		return sub != null ? sub.toString() : null;
 	}
 
-	public String resolveConversationId(AgentCoreContext context) {
-		String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-		if (sessionId == null || sessionId.isBlank()) {
-			sessionId = UUID.randomUUID().toString();
-		}
-		String userId = getUserId();
-		return userId != null ? userId + ":" + sessionId : sessionId;
-	}
-
 	public Map<String, Object> getClaims() {
 		return this.claims;
 	}
