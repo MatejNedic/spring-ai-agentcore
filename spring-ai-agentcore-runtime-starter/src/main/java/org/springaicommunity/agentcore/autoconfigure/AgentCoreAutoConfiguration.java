@@ -42,10 +42,6 @@ import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.bind.annotation.RestController;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
@@ -132,30 +128,12 @@ public class AgentCoreAutoConfiguration {
 			name = { "org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken",
 					"org.springframework.security.config.annotation.web.builders.HttpSecurity",
 					"org.springframework.security.web.SecurityFilterChain" })
-	@ConditionalOnProperty(name = "spring.security.oauth2.resourceserver.jwt.jwk-set-uri")
 	static class SpringSecurityAgentCorePrincipalConfiguration {
 
 		@Bean
 		@ConditionalOnMissingBean
 		public AgentCorePrincipalProvider agentCorePrincipalProvider() {
 			return new JwtAgentCorePrincipalProvider();
-		}
-
-		@Bean
-		@ConditionalOnMissingBean
-		public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-			http.csrf(AbstractHttpConfigurer::disable);
-			http.authorizeHttpRequests(
-					auth -> auth.requestMatchers("/", "/*.js", "/*.css", "/*.json", "/*.svg", "/*.html")
-						.permitAll()
-						.requestMatchers("/actuator/**")
-						.permitAll());
-
-			http.authorizeHttpRequests(
-					auth -> auth.requestMatchers("/invocations").authenticated().anyRequest().permitAll())
-				.oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
-
-			return http.build();
 		}
 
 	}
