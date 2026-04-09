@@ -1,5 +1,7 @@
 # Spring AI AgentCore
 
+📖 **[Documentation](https://springaicommunity.mintlify.app/projects/incubating/spring-ai-bedrock-agentcore)**
+
 A Spring Boot starter that enables existing Spring Boot applications to conform to the Amazon AgentCore Runtime contract with minimal configuration.
 
 ## Features
