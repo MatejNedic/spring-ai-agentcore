@@ -1,36 +1,21 @@
-# Spring AI AgentCore
+# Spring AI AgentCore SDK
 
-📖 **[Documentation](https://springaicommunity.mintlify.app/projects/incubating/spring-ai-bedrock-agentcore)**
+An open-source library that brings Amazon Bedrock AgentCore capabilities into Spring AI through familiar patterns: annotations, auto-configuration, and composable advisors.
 
-A Spring Boot starter that enables existing Spring Boot applications to conform to the Amazon AgentCore Runtime contract with minimal configuration.
+## Modules
 
-## Features
-
-- **Auto-configuration**: Automatically sets up AgentCore endpoints when added as dependency
-- **Annotation-based**: Simple `@AgentCoreInvocation` annotation to mark agent methods
-- **SSE Streaming**: Server-Sent Events support with `Flux<String>` return types
-- **Smart health checks**: Built-in `/ping` endpoint with Spring Boot Actuator integration
-- **Async task tracking**: Convenient methods for background task tracking
-- **Rate limiting**: Built-in Bucket4j throttling for invocations and ping endpoints
-- **AgentCore Memory integration**: Spring AI integration with Amazon AgentCore Memory service
-- **Browser automation**: Headless browser tools for web navigation, screenshots, and page interaction
-- **Code interpreter**: Execute Python, JavaScript, and TypeScript code in a secure sandbox
-
-## Examples
-
-See the `examples/` directory for complete working examples:
-
-- **`simple-spring-boot-app/`** - Minimal AgentCore agent with async task tracking
-- **`spring-ai-browser/`** - Browser automation with screenshots and content extraction
-- **`spring-ai-sse-chat-client/`** - SSE streaming with Spring AI and Amazon Bedrock
-- **`spring-ai-simple-chat-client/`** - Traditional Spring AI integration (without AgentCore starter)
-- **`spring-ai-override-invocations/`** - Custom controller override using marker interfaces
-- **`spring-ai-memory-integration/`** - Spring AI ChatMemory integration with Amazon AgentCore Memory service
-- **`spring-ai-extended-chat-client/`** - Spring AI chat client with OAuth authentication and per-user memory isolation, deployable to Amazon AgentCore Runtime.
+| Module | Description |
+|--------|-------------|
+| [Runtime Starter](spring-ai-agentcore-runtime-starter/) | Auto-configures `/invocations` and `/ping` endpoints, SSE streaming, health checks, rate limiting |
+| [Memory](spring-ai-agentcore-memory/) | Short-term (conversation history) and long-term memory (semantic, preferences, summaries, episodic) |
+| [Browser](spring-ai-agentcore-browser/) | Web navigation, content extraction, screenshots, form interaction via Playwright |
+| [Code Interpreter](spring-ai-agentcore-code-interpreter/) | Secure Python/JavaScript/TypeScript execution with file retrieval |
+| [Artifact Store](spring-ai-agentcore-artifact-store/) | Session-scoped, TTL-based storage for generated files |
+| [BOM](spring-ai-agentcore-bom/) | Bill of Materials for version alignment |
 
 ## Quick Start
 
-### 1. Add Dependency
+Add the BOM and the modules you need:
 
 ```xml
 <dependencyManagement>
@@ -38,7 +23,7 @@ See the `examples/` directory for complete working examples:
         <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agentcore-bom</artifactId>
-            <version>${version}</version>  <!-- Use latest: 1.0.0-RC2, 1.0.0-RC3, etc. -->
+            <version>1.0.0</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -50,423 +35,97 @@ See the `examples/` directory for complete working examples:
         <groupId>org.springaicommunity</groupId>
         <artifactId>spring-ai-agentcore-runtime-starter</artifactId>
     </dependency>
+    <!-- Add as needed -->
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-agentcore-memory</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-agentcore-browser</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springaicommunity</groupId>
+        <artifactId>spring-ai-agentcore-code-interpreter</artifactId>
+    </dependency>
 </dependencies>
 ```
 
-### 2. Create Agent Method
+Create an agent with memory, browser, and code interpreter:
 
 ```java
 @Service
-public class MyAgentService {
-
-    @AgentCoreInvocation
-    public String handleUserPrompt(MyRequest request) {
-        return "You said: " + request.prompt;
-    }
-}
-```
-
-### 3. Run Application
-
-The application will automatically expose:
-- `POST /invocations` - Agent processing endpoint
-- `GET /ping` - Health check endpoint
-
-## Supported Method Signatures
-
-### Basic POJO Method
-```java
-@AgentCoreInvocation
-public MyResponse processRequest(MyRequest request) {
-    return new MyResponse("Processed: " + request.prompt());
-}
-
-record MyRequest(String prompt) {}
-record MyResponse(String message) {}
-```
-
-### With AgentCore Context
-```java
-@AgentCoreInvocation
-public MyResponse processWithContext(MyRequest request, AgentCoreContext context) {
-    var sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-    return new MyResponse("Session " + sessionId + ": " + request.prompt());
-}
-```
-
-### Map Method (Flexible)
-```java
-@AgentCoreInvocation
-public Map<String, Object> processData(Map<String, Object> data) {
-    return Map.of(
-        "input", data,
-        "response", "Processed: " + data.get("message"),
-        "timestamp", System.currentTimeMillis()
-    );
-}
-```
-
-### String Method (text/plain support)
-```java
-@AgentCoreInvocation
-public String handlePrompt(String prompt) {
-    return "Response: " + prompt;
-}
-```
-
-### SSE Streaming with Spring AI
-```java
-@AgentCoreInvocation
-public Flux<String> streamingAgent(String prompt) {
-    return chatClient.prompt().user(prompt).stream().content();
-}
-```
-
-## Configuration
-
-The starter uses fixed configuration per AgentCore contract:
-- **Port**: 8080 (required by AgentCore)
-- **Endpoints**: `/invocations`, `/ping` (fixed paths)
-- **Health Integration**: Automatically integrates with Spring Boot Actuator when available
-
-### Health Monitoring
-
-The `/ping` endpoint provides intelligent health monitoring:
-
-**Without Spring Boot Actuator:**
-- Returns static "Healthy" status
-- Always responds with HTTP 200
-
-**With Spring Boot Actuator:**
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
-```
-- Integrates with Actuator health checks
-- Maps Actuator status to AgentCore format:
-    - `UP` → "Healthy" (HTTP 200)
-    - `DOWN` → "Unhealthy" (HTTP 503)
-    - Other → "Unknown" (HTTP 503)
-- Tracks status change timestamps
-- Thread-safe concurrent access
-
-### Background Task Tracking
-
-Amazon AgentCore Runtime monitors agent health and may shut down agents that appear idle. When your agent starts long-running background tasks (like file processing, data analysis, or calling other long-running agents), the runtime needs to know the agent is still actively working to avoid premature termination.
-
-The starter includes `AgentCoreTaskTracker` to communicate this state to the runtime:
-
-```java
-@AgentCoreInvocation
-public String asyncTaskHandling(MyRequest request, AgentCoreContext context) {
-    agentCoreTaskTracker.increment();  // Tell runtime: "I'm starting background work"
-
-    CompletableFuture.runAsync(() -> {
-        // Long-running background work
-    }).thenRun(agentCoreTaskTracker::decrement);  // Tell runtime: "Background work completed"
-
-    return "Task started";
-}
-```
-
-The '/ping' endpoint will return **HealthyBusy** while the AgentCoreTaskTracker is greater than 0.
-
-**How the Runtime Uses This Information:**
-- **"Healthy"**: Agent is ready, no background tasks → Runtime may scale down if idle
-- **"HealthyBusy"**: Agent is healthy but actively processing → Runtime keeps agent alive
-- **"Unhealthy"**: Agent has issues → Runtime may restart or replace agent
-
-This prevents the runtime from shutting down your agent while it's processing important background work.
-
-No additional configuration is required.
-
-### Rate Limiting
-
-The starter includes built-in rate limiting using Bucket4j to protect against excessive requests. Rate limiting is deactivated by default and will be active only if limits are defined in properties.
-
-**Configuration:**
-```properties
-# Customize rate limits in requests per minute (optional)
-agentcore.throttle.invocations-limit=50
-agentcore.throttle.ping-limit=200
-```
-
-**Rate Limit Response (429):**
-```json
-{"error":"Rate limit exceeded"}
-```
-
-Rate limits are applied per client IP address and reset every minute.
-
-## API Reference
-
-### POST /invocations
-
-**Request (defined by user):**
-```json
-{
-  "prompt": "Your prompt here"
-}
-```
-
-**Success Response (200) (defined by user):**
-```json
-{
-  "response": "Agent response",
-  "status": "success"
-}
-```
-
-### GET /ping
-
-**Response (200):**
-```json
-{
-  "status": "Healthy",
-  "time_of_last_update": 1697123456
-}
-```
-
-**Response (503) - When Actuator detects issues:**
-```json
-{
-  "status": "Unhealthy",
-  "time_of_last_update": 1697123456
-}
-```
-
-## Custom Controller Override
-
-The starter provides marker interfaces to override the default auto-configured controllers with custom implementations:
-
-### Override Invocations Controller
-
-Implement `AgentCoreInvocationsHandler` to provide custom `/invocations` endpoint handling:
-
-```java
-@RestController
-public class CustomInvocationsController implements AgentCoreInvocationsHandler {
-
-    @PostMapping("/invocations")
-    public ResponseEntity<?> handleInvocations(@RequestBody String request) {
-        // Custom invocation logic
-        return ResponseEntity.ok("Custom response");
-    }
-}
-```
-
-### Override Ping Controller
-
-Implement `AgentCorePingHandler` to provide custom `/ping` endpoint handling:
-
-```java
-@RestController
-public class CustomPingController implements AgentCorePingHandler {
-
-    @GetMapping("/ping")
-    public ResponseEntity<?> ping() {
-        // Custom health check logic
-        return ResponseEntity.ok(Map.of("status", "Custom Healthy"));
-    }
-}
-```
-
-When these marker interfaces are implemented, the corresponding auto-configured controllers are automatically disabled.
-
-See `examples/spring-ai-override-invocations/` for a complete working example.
-
-## AgentCore Memory
-
-The `spring-ai-agentcore-memory` module provides Spring AI ChatMemory integration with Amazon AgentCore Memory service, supporting both Short-Term Memory (STM) and Long-Term Memory (LTM) with 4 consolidation strategies.
-
-### Add Dependency
-
-```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-agentcore-memory</artifactId>
-</dependency>
-```
-
-### Short-Term Memory (STM)
-
-STM stores recent conversation history using Spring AI's `ChatMemoryRepository` interface.
-
-**Configuration:**
-```yaml
-agentcore:
-  memory:
-    memory-id: ${AGENTCORE_MEMORY_MEMORY_ID}
-    total-events-limit: 100  # Context window size
-```
-
-**Usage:**
-```java
-@Service
-public class ChatService {
-
-    public ChatService(ChatClient.Builder builder, ChatMemoryRepository memoryRepository) {
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(memoryRepository)
-                .build();
-
-        this.chatClient = builder
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
-    }
-
-    public Flux<String> chat(String userId, String sessionId, String message) {
-        return chatClient.prompt()
-                .user(message)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, userId + ":" + sessionId))
-                .stream()
-                .content();
-    }
-}
-```
-
-### Long-Term Memory (LTM)
-
-Long-term memory (LTM) is derived from short-term memory (STM) and is automatically consolidated by AgentCore through an asynchronous process. For more details, see the [Long-Term Memory documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/long-term-memory-long-term.html).
-
-LTM provides persistent knowledge across sessions with 4 consolidation strategies:
-
-| Strategy | Purpose | Retrieval |
-|----------|---------|-----------|
-| **Semantic** | User facts (e.g., "likes coffee") | Semantic search |
-| **User Preference** | Settings (e.g., "dark mode") | Lists all |
-| **Summary** | Conversation summaries | Semantic search |
-| **Episodic** | Past interactions & reflections | Semantic search |
-
-**Configuration:**
-```yaml
-agentcore:
-  memory:
-    memory-id: ${AGENTCORE_MEMORY_MEMORY_ID}
-    long-term:
-      namespace:
-        auto-register: true  # Auto-register namespaces on mismatch (default: false)
-      semantic:
-        strategy-id: ${AGENTCORE_MEMORY_LONG_TERM_SEMANTIC_STRATEGY_ID}
-      user-preference:
-        strategy-id: ${AGENTCORE_MEMORY_LONG_TERM_USER_PREFERENCE_STRATEGY_ID}
-      summary:
-        strategy-id: ${AGENTCORE_MEMORY_LONG_TERM_SUMMARY_STRATEGY_ID}
-      episodic:
-        strategy-id: ${AGENTCORE_MEMORY_LONG_TERM_EPISODIC_STRATEGY_ID}
-```
-
-> **Note:** The `namespace.auto-register` option automatically updates AWS Memory namespaces when they don't match the expected pattern. This is useful during development but should be used with caution in production.
-
-**Usage with STM + LTM:**
-```java
-@Service
-public class ChatService {
+public class MyAgent {
 
     private final ChatClient chatClient;
+    private final AgentCoreMemory agentCoreMemory;
 
-    public ChatService(ChatClient.Builder builder,
-                       AgentCoreMemory agentCoreMemory) {
-
+    public MyAgent(
+            ChatClient.Builder builder,
+            AgentCoreMemory agentCoreMemory,
+            @Qualifier("browserToolCallbackProvider") ToolCallbackProvider browserTools,
+            @Qualifier("codeInterpreterToolCallbackProvider") ToolCallbackProvider codeInterpreterTools) {
+        this.agentCoreMemory = agentCoreMemory;
         this.chatClient = builder
-                .defaultAdvisors(agentCoreMemory.advisors)
+                .defaultToolCallbacks(browserTools, codeInterpreterTools)
                 .build();
     }
 
-    public Flux<String> chat(String conversationId, String message) {
+    @AgentCoreInvocation
+    public Flux<String> chat(PromptRequest request, AgentCoreContext context) {
+        String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
+
         return chatClient.prompt()
-                .user(message)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .user(request.prompt())
+                .advisors(agentCoreMemory.advisors)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "user:" + sessionId))
                 .stream()
                 .content();
     }
 }
+
+record PromptRequest(String prompt) {}
 ```
 
-The `AgentCoreMemory` bean is auto-configured when you set the required properties.
+This gives you a production-ready agent with streaming, conversation memory, web browsing, and code execution — deployed to AgentCore Runtime or standalone.
 
-For detailed configuration options and API reference, see [spring-ai-agentcore-memory/README.md](spring-ai-agentcore-memory/README.md).
+## Deployment
 
-## Browser Automation
+The SDK supports two deployment models:
 
-The `spring-ai-agentcore-browser` module provides headless browser tools for web navigation, content extraction, screenshots, and page interaction using Playwright over CDP.
+- **AgentCore Runtime** — Fully managed: package as ARM64 container, push to ECR, create a runtime. Scales to zero, pay-per-use.
+- **Standalone** — Use any module independently on EKS, ECS, EC2, or on-premises.
 
-### Add Dependency
+See [examples/terraform/](examples/terraform/) for infrastructure-as-code with IAM and OAuth2 authentication.
 
-```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-agentcore-browser</artifactId>
-</dependency>
-```
+## Examples
 
-### Available Tools
+| Example | Description |
+|---------|-------------|
+| [simple-spring-boot-app](examples/simple-spring-boot-app/) | Minimal agent with request handling |
+| [spring-ai-sse-chat-client](examples/spring-ai-sse-chat-client/) | Streaming responses with SSE |
+| [spring-ai-memory-integration](examples/spring-ai-memory-integration/) | Short-term and long-term memory |
+| [spring-ai-extended-chat-client](examples/spring-ai-extended-chat-client/) | OAuth auth with per-user memory isolation |
+| [spring-ai-browser](examples/spring-ai-browser/) | Web browsing and screenshots |
+| [spring-ai-simple-chat-client](examples/spring-ai-simple-chat-client/) | Traditional Spring AI (without runtime starter) |
+| [spring-ai-override-invocations](examples/spring-ai-override-invocations/) | Custom controller override |
 
-| Tool | Description |
-|------|-------------|
-| `browseUrl` | Navigate to URL and extract page content |
-| `takeScreenshot` | Capture screenshot (stored in artifact cache) |
-| `clickElement` | Click element by CSS selector |
-| `fillForm` | Fill form field by selector |
-| `evaluateScript` | Execute JavaScript on page |
+## Requirements
 
-### Modes
-
-- **agentcore** (default): Uses AgentCore Browser managed service
-- **local**: Uses locally launched Chromium for development
-
-```properties
-agentcore.browser.mode=local  # for local development
-```
-
-For detailed configuration and usage, see [spring-ai-agentcore-browser/README.md](spring-ai-agentcore-browser/README.md).
-
-## Code Interpreter
-
-The `spring-ai-agentcore-code-interpreter` module provides secure code execution in Python, JavaScript, and TypeScript with automatic file retrieval.
-
-### Add Dependency
-
-```xml
-<dependency>
-    <groupId>org.springaicommunity</groupId>
-    <artifactId>spring-ai-agentcore-code-interpreter</artifactId>
-</dependency>
-```
-
-### Features
-
-- Execute code in Python, JavaScript, or TypeScript
-- Pre-installed libraries: numpy, pandas, matplotlib (Python)
-- Automatic file retrieval (charts, CSVs, PDFs)
-- Session-scoped artifact storage
-
-For detailed configuration and usage, see [spring-ai-agentcore-code-interpreter/README.md](spring-ai-agentcore-code-interpreter/README.md).
-
-## Artifact Store
-
-Both browser and code interpreter modules use the shared `spring-ai-agentcore-artifact-store` module for session-scoped artifact storage. The store provides:
-
-- Thread-safe multi-session support
-- TTL-based automatic cleanup
-- Configurable max size per module
-
-```java
-// Inject artifact store
-@Qualifier("browserArtifactStore") ArtifactStore<GeneratedFile> browserArtifacts
-@Qualifier("codeInterpreterArtifactStore") ArtifactStore<GeneratedFile> codeArtifacts
-
-// Store and retrieve artifacts
-artifactStore.store(sessionId, generatedFile);
-List<GeneratedFile> files = artifactStore.retrieve(sessionId);  // destructive read
-```
+- Java 17+ (Java 25 recommended)
+- Spring Boot 3.5+
+- An AWS account
 
 ## Development
 
-See [AGENTS.md](AGENTS.md) for build commands, testing, and project structure.
+```bash
+mvn clean install              # Build
+mvn test                       # Unit tests
+mvn spring-javaformat:apply    # Format (required before commit)
+```
+
+Each module also has an [AGENTS.md](AGENTS.md) file providing context for AI coding assistants (project structure, conventions, key classes).
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+Apache License 2.0
