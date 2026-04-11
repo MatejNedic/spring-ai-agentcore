@@ -1,5 +1,7 @@
 # Spring AI AgentCore SDK
 
+📖 **[Documentation](https://springaicommunity.mintlify.app/projects/incubating/spring-ai-bedrock-agentcore)**
+
 An open-source library that brings Amazon Bedrock AgentCore capabilities into Spring AI through familiar patterns: annotations, auto-configuration, and composable advisors.
 
 ## Modules
