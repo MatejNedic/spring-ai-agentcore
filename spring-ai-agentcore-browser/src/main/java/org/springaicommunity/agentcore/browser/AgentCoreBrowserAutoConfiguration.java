@@ -58,7 +58,7 @@ public class AgentCoreBrowserAutoConfiguration {
 
 	// ========== AgentCore mode beans ==========
 
-	@Bean
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(name = "agentcore.browser.mode", havingValue = "agentcore", matchIfMissing = true)
 	BedrockAgentCoreClient bedrockAgentCoreClient() {
