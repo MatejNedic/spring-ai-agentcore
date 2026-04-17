@@ -44,14 +44,14 @@ public class AgentCoreCodeInterpreterAutoConfiguration {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreCodeInterpreterAutoConfiguration.class);
 
-	@Bean
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	BedrockAgentCoreClient bedrockAgentCoreClient() {
 		logger.debug("Creating BedrockAgentCoreClient bean");
 		return BedrockAgentCoreClient.create();
 	}
 
-	@Bean
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	BedrockAgentCoreAsyncClient bedrockAgentCoreAsyncClient() {
 		logger.debug("Creating BedrockAgentCoreAsyncClient bean");

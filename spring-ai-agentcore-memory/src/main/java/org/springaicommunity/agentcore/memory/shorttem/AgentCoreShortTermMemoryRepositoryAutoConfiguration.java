@@ -35,7 +35,7 @@ public class AgentCoreShortTermMemoryRepositoryAutoConfiguration {
 	private static final Logger logger = LoggerFactory
 		.getLogger(AgentCoreShortTermMemoryRepositoryAutoConfiguration.class);
 
-	@Bean
+	@Bean(destroyMethod = "close")
 	@ConditionalOnMissingBean
 	@ConditionalOnProperty(prefix = AgentCoreMemoryProperties.CONFIG_PREFIX, name = "memory-id")
 	BedrockAgentCoreClient bedrockAgentCoreClient() {
