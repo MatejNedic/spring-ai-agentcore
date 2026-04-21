@@ -19,8 +19,9 @@ package org.springaicommunity.agentcore.throttle;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.Filter;
@@ -34,6 +35,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
+/**
+ * Servlet filter that applies per-client rate limits.
+ * <p>
+ * The {@link #buckets} field is package-private for tests in this package only; it is not
+ * part of the public API. Tests that assert on cache size should call
+ * {@code buckets.cleanUp()} first so eviction work is applied before reading
+ * {@code estimatedSize()}.
+ */
 public class RateLimitingFilter implements Filter {
 
 	private static final String DEFAULT_CLIENT_ID = "default";
@@ -45,13 +54,22 @@ public class RateLimitingFilter implements Filter {
 
 	private static final String UTF_8 = "UTF-8";
 
-	private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+	private static final long DEFAULT_MAX_BUCKETS = 10_000;
+
+	private static final Duration DEFAULT_BUCKET_EXPIRY = Duration.ofMinutes(5);
+
+	final Cache<String, Bucket> buckets;
 
 	private final Map<String, Integer> pathLimits;
 
 	public RateLimitingFilter(int invocationsLimit, int pingLimit) {
+		this(invocationsLimit, pingLimit, DEFAULT_MAX_BUCKETS, DEFAULT_BUCKET_EXPIRY);
+	}
+
+	public RateLimitingFilter(int invocationsLimit, int pingLimit, long maxBuckets, Duration bucketExpiry) {
 		this.pathLimits = Map.of(ThrottleConfiguration.INVOCATIONS_PATH, invocationsLimit,
 				ThrottleConfiguration.PING_PATH, pingLimit);
+		this.buckets = Caffeine.newBuilder().maximumSize(maxBuckets).expireAfterAccess(bucketExpiry).build();
 	}
 
 	@Override
@@ -95,7 +113,7 @@ public class RateLimitingFilter implements Filter {
 
 	private Bucket getBucket(String clientId, String path) {
 		var key = clientId + ':' + path;
-		return buckets.computeIfAbsent(key, k -> createBucket(path));
+		return buckets.get(key, k -> createBucket(path));
 	}
 
 	private Bucket createBucket(String path) {
