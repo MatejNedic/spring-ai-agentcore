@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * automatically include the spring-ai-agentcore identifier in the User-Agent header.
  * Preserves any user-provided value by appending rather than replacing.
  *
- * @author Yuriy Bezsonov
+ * @author Matt Meckes
  */
 public final class UserAgentProvider {
 

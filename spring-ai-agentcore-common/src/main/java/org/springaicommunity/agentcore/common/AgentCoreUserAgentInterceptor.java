@@ -25,7 +25,7 @@ import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
  * Global interceptor auto-loaded by the AWS SDK via service loader. Configures the
  * User-Agent app ID in its static initializer so every SDK client picks it up.
  *
- * @author Yuriy Bezsonov
+ * @author Matt Meckes
  */
 public final class AgentCoreUserAgentInterceptor implements ExecutionInterceptor {
 
