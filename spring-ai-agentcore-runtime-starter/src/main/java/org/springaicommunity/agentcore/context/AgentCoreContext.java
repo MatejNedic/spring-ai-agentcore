@@ -18,6 +18,9 @@ package org.springaicommunity.agentcore.context;
 
 import org.springframework.http.HttpHeaders;
 
+import static org.springaicommunity.agentcore.context.AgentCoreHeaders.USER_ID;
+import static org.springaicommunity.agentcore.context.AgentCoreHeaders.WORKLOAD_ACCESS_TOKEN_RUNTIME;
+
 /**
  * Context object containing HTTP headers from AgentCore invocation requests.
  *
@@ -66,6 +69,27 @@ public class AgentCoreContext {
 			return null;
 		}
 		return headers.getFirst(headerName);
+	}
+
+	/**
+	 * Gets the workload access token automatically provided by AgentCore Runtime. This
+	 * token authorizes the agent to access AgentCore Identity credential providers (API
+	 * keys, OAuth tokens) without manual token exchange.
+	 * @return the workload access token, or {@code null} if not running on AgentCore
+	 * Runtime
+	 */
+	public String getWorkloadAccessToken() {
+		return headers.getFirst(WORKLOAD_ACCESS_TOKEN_RUNTIME);
+	}
+
+	/**
+	 * Gets the end-user identifier extracted by AgentCore Runtime from the inbound
+	 * authentication token. This identifies the user on whose behalf the agent is acting.
+	 * @return the user ID, or {@code null} if no user identity is bound to this
+	 * invocation
+	 */
+	public String getUserId() {
+		return headers.getFirst(USER_ID);
 	}
 
 }

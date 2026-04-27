@@ -1,0 +1,2 @@
+org.springaicommunity.agentcore.identity.autoconfiguration.AwsAgentCoreIdentityAutoConfiguration
+org.springaicommunity.agentcore.identity.autoconfiguration.AwsCredentialsAndRegionAutoConfiguration
