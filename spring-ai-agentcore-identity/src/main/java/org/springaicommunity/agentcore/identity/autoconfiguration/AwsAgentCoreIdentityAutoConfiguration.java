@@ -27,6 +27,10 @@ import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClientBuilder;
 
+/**
+ * Autoconfiguration for Bedrock AWS SDK client and {@link AgentCoreIdentityTemplate}
+ * @author Matej Nedic
+ */
 @AutoConfiguration
 @AutoConfigureAfter({ AwsCredentialsAndRegionAutoConfiguration.class })
 public class AwsAgentCoreIdentityAutoConfiguration {

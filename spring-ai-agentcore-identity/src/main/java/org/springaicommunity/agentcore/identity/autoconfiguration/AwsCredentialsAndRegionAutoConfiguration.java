@@ -38,8 +38,6 @@ import java.util.List;
 
 /**
  * Auto-configuration for AWS credentials, region, and {@link BedrockAgentCoreClient}.
- * Supports static credentials (access key + secret key + optional session token) or the
- * default AWS credentials chain as fallback.
  *
  * @author Matej Nedic
  */
