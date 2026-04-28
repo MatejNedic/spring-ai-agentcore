@@ -16,15 +16,20 @@
 
 package org.springaicommunity.agentcore.common;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UserAgentProviderTest {
 
+	@AfterEach
+	void resetSystemProperty() {
+		System.clearProperty("sdk.ua.appId");
+	}
+
 	@Test
 	void configureSetsSystemProperty() {
-		System.clearProperty("sdk.ua.appId");
 		UserAgentProvider.configure();
 		assertThat(System.getProperty("sdk.ua.appId")).startsWith("spring-ai-agentcore/");
 	}
