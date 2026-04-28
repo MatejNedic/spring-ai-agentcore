@@ -27,12 +27,15 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.profiles.ProfileFile;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,12 +45,12 @@ import java.util.List;
  * @author Matej Nedic
  */
 @AutoConfiguration
-@EnableConfigurationProperties(AwsProperties.class)
+@EnableConfigurationProperties(AgentCoreIdentityAwsProperties.class)
 public class AwsCredentialsAndRegionAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public AwsRegionProvider regionProvider(AwsProperties properties) {
+	public AwsRegionProvider regionProvider(AgentCoreIdentityAwsProperties properties) {
 		if (StringUtils.hasText(properties.getRegion())) {
 			return new StaticRegionProvider(properties.getRegion());
 		}
@@ -56,16 +59,24 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public AwsCredentialsProvider credentialsProvider(AwsProperties properties) {
+	public AwsCredentialsProvider credentialsProvider(AgentCoreIdentityAwsProperties properties) {
 		List<AwsCredentialsProvider> providers = new ArrayList<>();
+
+
+		if (StringUtils.hasText(properties.getAccessKey()) && StringUtils.hasText(properties.getSecretKey())) {
+			providers.add(createStaticCredentialsProvider(properties));
+		}
 
 		if (properties.isInstanceProfile()) {
 			providers.add(InstanceProfileCredentialsProvider.create());
 		}
 
-		if (StringUtils.hasText(properties.getAccessKey()) && StringUtils.hasText(properties.getSecretKey())) {
-			providers.add(createStaticCredentialsProvider(properties));
+		Profile profile = properties.getProfile();
+		if (profile != null && profile.getName() != null) {
+			providers.add(createProfileCredentialProvider(profile));
 		}
+
+
 		if (providers.isEmpty()) {
 			return DefaultCredentialsProvider.builder().build();
 		}
@@ -73,7 +84,21 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 		return AwsCredentialsProviderChain.builder().credentialsProviders(providers).build();
 	}
 
-	private AwsCredentialsProvider createStaticCredentialsProvider(AwsProperties properties) {
+	private static ProfileCredentialsProvider createProfileCredentialProvider(Profile profile) {
+		var builder = ProfileCredentialsProvider.builder().profileName(profile.getName());
+		if (profile.getPath() != null) {
+			var profileFile = ProfileFile.builder()
+				.type(ProfileFile.Type.CREDENTIALS)
+				.content(Paths.get(profile.getPath()))
+				.build();
+			builder.profileFile(profileFile);
+		}
+		return builder.build();
+	}
+
+
+
+	private AwsCredentialsProvider createStaticCredentialsProvider(AgentCoreIdentityAwsProperties properties) {
 		if (StringUtils.hasText(properties.getSessionToken())) {
 			return StaticCredentialsProvider.create(AwsSessionCredentials.create(properties.getAccessKey(),
 					properties.getSecretKey(), properties.getSessionToken()));

@@ -38,15 +38,15 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public BedrockAgentCoreClient bedrockAgentCoreClient(AwsRegionProvider awsRegionProvider,
-			AwsCredentialsProvider awsCredentialsProvider, AwsProperties awsProperties) {
+			AwsCredentialsProvider awsCredentialsProvider, AgentCoreIdentityAwsProperties agentCoreIdentityAwsProperties) {
 		var builder = BedrockAgentCoreClient.builder()
 			.region(awsRegionProvider.getRegion())
 			.credentialsProvider(awsCredentialsProvider)
-			.overrideConfiguration(c -> c.apiCallTimeout(awsProperties.getTimeout()));
-		if (awsProperties.getEndpoint() != null) {
-			builder.endpointOverride(awsProperties.getEndpoint());
+			.overrideConfiguration(c -> c.apiCallTimeout(agentCoreIdentityAwsProperties.getTimeout()));
+		if (agentCoreIdentityAwsProperties.getEndpoint() != null) {
+			builder.endpointOverride(agentCoreIdentityAwsProperties.getEndpoint());
 		}
-		configureSyncHttpClient(builder, awsProperties);
+		configureSyncHttpClient(builder, agentCoreIdentityAwsProperties);
 		return builder.build();
 	}
 
@@ -56,8 +56,8 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 		return new AgentCoreIdentityTemplate(bedrockAgentCoreClient);
 	}
 
-	public static void configureSyncHttpClient(BedrockAgentCoreClientBuilder builder, AwsProperties awsProperties) {
-		SyncClientProperties properties = awsProperties.getSyncClient();
+	public static void configureSyncHttpClient(BedrockAgentCoreClientBuilder builder, AgentCoreIdentityAwsProperties agentCoreIdentityAwsProperties) {
+		SyncClientProperties properties = agentCoreIdentityAwsProperties.getSyncClient();
 		if (properties != null) {
 			var httpClientBuilder = ApacheHttpClient.builder();
 			PropertyMapper propertyMapper = PropertyMapper.get();

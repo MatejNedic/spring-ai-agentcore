@@ -27,10 +27,10 @@ import java.time.Duration;
  *
  * @author Matej Nedic
  */
-@ConfigurationProperties(AwsProperties.CONFIG_PREFIX)
-public class AwsProperties {
+@ConfigurationProperties(AgentCoreIdentityAwsProperties.CONFIG_PREFIX)
+public class AgentCoreIdentityAwsProperties {
 
-	public static final String CONFIG_PREFIX = "spring.agent-core.credentials";
+	public static final String CONFIG_PREFIX = "spring.agent-core.identity";
 
 	/**
 	 * AWS region to use. Defaults to us-east-1.
@@ -88,6 +88,8 @@ public class AwsProperties {
 	 * Configures an instance profile credentials provider with no further configuration.
 	 */
 	private boolean instanceProfile = false;
+
+	private Profile profile;
 
 	public boolean isInstanceProfile() {
 		return this.instanceProfile;
@@ -177,4 +179,11 @@ public class AwsProperties {
 		this.endpoint = endpoint;
 	}
 
+	public Profile getProfile() {
+		return profile;
+	}
+
+	public void setProfile(Profile profile) {
+		this.profile = profile;
+	}
 }
