@@ -115,6 +115,39 @@ class SpanEventBuilderTest {
 		assertThat(event.get("body").toString()).contains("finish_reason=end_turn");
 	}
 
+	@Test
+	void tokenUsageAttributesAreEmittedWhenBothPresent() {
+		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.tokenUsage(120, 45)
+			.buildSessionSpans()
+			.getFirst();
+
+		assertThat(attributes(span)).containsEntry("gen_ai.usage.input_tokens", 120)
+			.containsEntry("gen_ai.usage.output_tokens", 45);
+	}
+
+	@Test
+	void tokenUsageAttributesAreOmittedWhenNull() {
+		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.tokenUsage(null, null)
+			.buildSessionSpans()
+			.getFirst();
+
+		assertThat(attributes(span)).doesNotContainKey("gen_ai.usage.input_tokens")
+			.doesNotContainKey("gen_ai.usage.output_tokens");
+	}
+
+	@Test
+	void tokenUsagePartiallyPresentEmitsOnlyAvailableAttributes() {
+		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.tokenUsage(120, null)
+			.buildSessionSpans()
+			.getFirst();
+
+		assertThat(attributes(span)).containsEntry("gen_ai.usage.input_tokens", 120)
+			.doesNotContainKey("gen_ai.usage.output_tokens");
+	}
+
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> attributes(Map<String, Object> span) {
 		return (Map<String, Object>) span.get("attributes");

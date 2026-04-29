@@ -81,6 +81,10 @@ public class SpanEventBuilder {
 
 	private String finishReason = "end_turn";
 
+	private Integer inputTokens;
+
+	private Integer outputTokens;
+
 	private SpanEventBuilder(String traceId, String sessionId) {
 		this.traceId = (traceId != null) ? traceId : generateTraceId();
 		this.spanId = generateSpanId();
@@ -144,6 +148,19 @@ public class SpanEventBuilder {
 	}
 
 	/**
+	 * Set the per-turn token usage to emit as OTel GenAI span attributes
+	 * ({@code gen_ai.usage.input_tokens} and {@code gen_ai.usage.output_tokens}). Null
+	 * values are skipped — the corresponding attribute is omitted rather than set to
+	 * zero, since many providers return {@code null} when usage data is unavailable and a
+	 * hard zero would be misleading.
+	 */
+	public SpanEventBuilder tokenUsage(Integer inputTokens, Integer outputTokens) {
+		this.inputTokens = inputTokens;
+		this.outputTokens = outputTokens;
+		return this;
+	}
+
+	/**
 	 * Build all session spans (span + events) as required by the Evaluate API.
 	 * @return list of spans and events to pass to sessionSpans
 	 */
@@ -185,6 +202,12 @@ public class SpanEventBuilder {
 		attributes.put("gen_ai.request.model", this.modelId);
 		if (this.sessionId != null) {
 			attributes.put("session.id", this.sessionId);
+		}
+		if (this.inputTokens != null) {
+			attributes.put("gen_ai.usage.input_tokens", this.inputTokens);
+		}
+		if (this.outputTokens != null) {
+			attributes.put("gen_ai.usage.output_tokens", this.outputTokens);
 		}
 		span.put("attributes", attributes);
 		span.put("status", Map.of("code", "OK"));

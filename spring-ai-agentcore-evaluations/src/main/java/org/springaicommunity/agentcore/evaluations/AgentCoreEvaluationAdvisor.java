@@ -243,7 +243,8 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 				.promptEvent(userPrompt)
 				.completionEvent(assistantResponse)
 				.modelId(extractModelId(response))
-				.finishReason(extractFinishReason(response));
+				.finishReason(extractFinishReason(response))
+				.tokenUsage(extractInputTokens(response), extractOutputTokens(response));
 
 			List<Map<String, Object>> spans = spanBuilder.buildSessionSpans();
 
@@ -337,6 +338,20 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 		}
 		String reason = response.chatResponse().getResult().getMetadata().getFinishReason();
 		return (reason != null && !reason.isBlank()) ? reason : null;
+	}
+
+	private Integer extractInputTokens(ChatClientResponse response) {
+		if (response.chatResponse() == null) {
+			return null;
+		}
+		return response.chatResponse().getMetadata().getUsage().getPromptTokens();
+	}
+
+	private Integer extractOutputTokens(ChatClientResponse response) {
+		if (response.chatResponse() == null) {
+			return null;
+		}
+		return response.chatResponse().getMetadata().getUsage().getCompletionTokens();
 	}
 
 	@Override
