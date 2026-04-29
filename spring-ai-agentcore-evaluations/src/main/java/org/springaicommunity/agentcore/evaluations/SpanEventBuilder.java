@@ -79,6 +79,8 @@ public class SpanEventBuilder {
 
 	private String modelId = "unknown";
 
+	private String finishReason = "end_turn";
+
 	private SpanEventBuilder(String traceId, String sessionId) {
 		this.traceId = (traceId != null) ? traceId : generateTraceId();
 		this.spanId = generateSpanId();
@@ -125,6 +127,18 @@ public class SpanEventBuilder {
 	public SpanEventBuilder modelId(String modelId) {
 		if (modelId != null && !modelId.isBlank()) {
 			this.modelId = modelId;
+		}
+		return this;
+	}
+
+	/**
+	 * Set the finish reason emitted in the assistant message's body (e.g.
+	 * {@code "end_turn"}, {@code "tool_use"}, {@code "max_tokens"}). Defaults to
+	 * {@code "end_turn"} when not set or when the value is blank.
+	 */
+	public SpanEventBuilder finishReason(String finishReason) {
+		if (finishReason != null && !finishReason.isBlank()) {
+			this.finishReason = finishReason;
 		}
 		return this;
 	}
@@ -199,7 +213,7 @@ public class SpanEventBuilder {
 		}
 		if (this.assistantResponse != null) {
 			body.put("output", Map.of("messages", List.of(Map.of("role", "assistant", "content",
-					Map.of("message", this.assistantResponse, "finish_reason", "end_turn")))));
+					Map.of("message", this.assistantResponse, "finish_reason", this.finishReason)))));
 		}
 		return body;
 	}

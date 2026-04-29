@@ -80,6 +80,41 @@ class SpanEventBuilderTest {
 		assertThat(bodyStr).contains("Paris.");
 	}
 
+	@Test
+	void defaultFinishReasonIsEndTurnWhenNotSet() {
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.completionEvent("Paris.")
+			.buildSessionSpans()
+			.get(1);
+
+		assertThat(event.get("body").toString()).contains("finish_reason=end_turn");
+	}
+
+	@Test
+	void explicitFinishReasonIsPropagatedToBody() {
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.completionEvent("Partial response...")
+			.finishReason("tool_use")
+			.buildSessionSpans()
+			.get(1);
+
+		String bodyStr = event.get("body").toString();
+		assertThat(bodyStr).contains("finish_reason=tool_use");
+		assertThat(bodyStr).doesNotContain("finish_reason=end_turn");
+	}
+
+	@Test
+	void blankFinishReasonIsIgnored() {
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.completionEvent("Paris.")
+			.finishReason("   ")
+			.buildSessionSpans()
+			.get(1);
+
+		// Falls back to default
+		assertThat(event.get("body").toString()).contains("finish_reason=end_turn");
+	}
+
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> attributes(Map<String, Object> span) {
 		return (Map<String, Object>) span.get("attributes");

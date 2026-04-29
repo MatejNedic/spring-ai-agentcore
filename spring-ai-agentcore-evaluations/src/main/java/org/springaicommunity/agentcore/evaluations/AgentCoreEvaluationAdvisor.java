@@ -242,7 +242,8 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 			SpanEventBuilder spanBuilder = SpanEventBuilder.agentInvocation(traceId, sessionId)
 				.promptEvent(userPrompt)
 				.completionEvent(assistantResponse)
-				.modelId(extractModelId(response));
+				.modelId(extractModelId(response))
+				.finishReason(extractFinishReason(response));
 
 			List<Map<String, Object>> spans = spanBuilder.buildSessionSpans();
 
@@ -325,6 +326,17 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 		}
 		String model = response.chatResponse().getMetadata().getModel();
 		return (model != null && !model.isBlank()) ? model : null;
+	}
+
+	// ChatResponse.getResult() is declared non-null but returns null when generations
+	// is empty (same contract-vs-source mismatch as extractAssistantResponse above).
+	@SuppressWarnings("ConstantConditions")
+	private String extractFinishReason(ChatClientResponse response) {
+		if (response.chatResponse() == null || response.chatResponse().getResult() == null) {
+			return null;
+		}
+		String reason = response.chatResponse().getResult().getMetadata().getFinishReason();
+		return (reason != null && !reason.isBlank()) ? reason : null;
 	}
 
 	@Override
