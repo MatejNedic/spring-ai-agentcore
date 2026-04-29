@@ -85,6 +85,15 @@ public class SpanEventBuilder {
 
 	private Integer outputTokens;
 
+	/**
+	 * Optional list of additional messages (system messages, prior user/assistant turns,
+	 * tool-response messages) to include in the body's {@code input.messages} array
+	 * before the current user prompt. Kept optional so callers that don't wire it
+	 * preserve the pre-existing single-message wire shape verified against the Evaluate
+	 * API.
+	 */
+	private List<Map<String, Object>> history = List.of();
+
 	private SpanEventBuilder(String traceId, String sessionId) {
 		this.traceId = (traceId != null) ? traceId : generateTraceId();
 		this.spanId = generateSpanId();
@@ -161,6 +170,18 @@ public class SpanEventBuilder {
 	}
 
 	/**
+	 * Supply conversation messages to emit before the current user prompt in the span
+	 * body's {@code input.messages} array. Each entry must already be in the ADOT message
+	 * shape (keys {@code role} and {@code content}). Callers build this from Spring AI's
+	 * {@code List<Message>} before passing in. Passing {@code null} or an empty list is a
+	 * no-op and preserves the single-message baseline shape.
+	 */
+	public SpanEventBuilder history(List<Map<String, Object>> history) {
+		this.history = (history != null) ? history : List.of();
+		return this;
+	}
+
+	/**
 	 * Build all session spans (span + events) as required by the Evaluate API.
 	 * @return list of spans and events to pass to sessionSpans
 	 */
@@ -228,11 +249,14 @@ public class SpanEventBuilder {
 
 	private Map<String, Object> buildBody() {
 		Map<String, Object> body = new HashMap<>();
-		if (this.userPrompt != null) {
-			// Strands wraps user content as a JSON array of text parts.
-			String wrapped = toJson(List.of(Map.of("text", this.userPrompt)));
-			body.put("input",
-					Map.of("messages", List.of(Map.of("role", "user", "content", Map.of("content", wrapped)))));
+		if (this.userPrompt != null || !this.history.isEmpty()) {
+			List<Map<String, Object>> messages = new ArrayList<>(this.history);
+			if (this.userPrompt != null) {
+				// Strands wraps user content as a JSON array of text parts.
+				String wrapped = toJson(List.of(Map.of("text", this.userPrompt)));
+				messages.add(Map.of("role", "user", "content", Map.of("content", wrapped)));
+			}
+			body.put("input", Map.of("messages", messages));
 		}
 		if (this.assistantResponse != null) {
 			body.put("output", Map.of("messages", List.of(Map.of("role", "assistant", "content",

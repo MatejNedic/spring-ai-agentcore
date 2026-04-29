@@ -148,6 +148,55 @@ class SpanEventBuilderTest {
 			.doesNotContainKey("gen_ai.usage.output_tokens");
 	}
 
+	@Test
+	void historyEntriesAreEmittedBeforeCurrentUserPrompt() {
+		List<Map<String, Object>> history = List.of(Map.of("role", "system", "content", "You are helpful."),
+				Map.of("role", "user", "content", "Earlier question"),
+				Map.of("role", "assistant", "content", "Earlier answer"));
+
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.promptEvent("Current question")
+			.completionEvent("Current answer")
+			.history(history)
+			.buildSessionSpans()
+			.get(1);
+
+		String bodyStr = event.get("body").toString();
+		// All history entries plus current user are in input.messages
+		assertThat(bodyStr).contains("You are helpful.")
+			.contains("Earlier question")
+			.contains("Earlier answer")
+			.contains("Current question");
+		// Current answer in output.messages
+		assertThat(bodyStr).contains("Current answer");
+	}
+
+	@Test
+	void emptyHistoryPreservesSingleMessageWireShape() {
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.promptEvent("Current question")
+			.completionEvent("Current answer")
+			.history(List.of())
+			.buildSessionSpans()
+			.get(1);
+
+		String bodyStr = event.get("body").toString();
+		// Exact match of the baseline — one user entry in input.messages
+		assertThat(bodyStr).contains("Current question").contains("Current answer");
+	}
+
+	@Test
+	void nullHistoryTreatedAsEmpty() {
+		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
+			.promptEvent("Q")
+			.completionEvent("A")
+			.history(null)
+			.buildSessionSpans()
+			.get(1);
+
+		assertThat(event.get("body").toString()).contains("Q").contains("A");
+	}
+
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> attributes(Map<String, Object> span) {
 		return (Map<String, Object>) span.get("attributes");

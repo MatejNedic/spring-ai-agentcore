@@ -18,6 +18,7 @@ package org.springaicommunity.agentcore.evaluations;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +42,8 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -85,6 +88,8 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 
 	private final Executor executor;
 
+	private final boolean includeHistory;
+
 	/**
 	 * Shared default executor used when the caller does not supply one. A single
 	 * virtual-thread-per-task executor is kept for the JVM lifetime so that manually
@@ -102,6 +107,7 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 		this.callback = builder.callback;
 		this.order = builder.order;
 		this.executor = builder.executor != null ? builder.executor : DEFAULT_EXECUTOR;
+		this.includeHistory = builder.includeHistory;
 	}
 
 	public static Builder builder(AgentCoreEvaluationClient client) {
@@ -125,6 +131,8 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 		private int order = 1000; // Run after most advisors
 
 		private Executor executor;
+
+		private boolean includeHistory = false;
 
 		private Builder(AgentCoreEvaluationClient client) {
 			Objects.requireNonNull(client, "AgentCoreEvaluationClient is required");
@@ -163,6 +171,11 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 
 		public Builder executor(Executor executor) {
 			this.executor = executor;
+			return this;
+		}
+
+		public Builder includeHistory(boolean includeHistory) {
+			this.includeHistory = includeHistory;
 			return this;
 		}
 
@@ -244,7 +257,8 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 				.completionEvent(assistantResponse)
 				.modelId(extractModelId(response))
 				.finishReason(extractFinishReason(response))
-				.tokenUsage(extractInputTokens(response), extractOutputTokens(response));
+				.tokenUsage(extractInputTokens(response), extractOutputTokens(response))
+				.history(this.includeHistory ? extractHistory(request) : List.of());
 
 			List<Map<String, Object>> spans = spanBuilder.buildSessionSpans();
 
@@ -300,12 +314,58 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 	}
 
 	private String extractUserPrompt(ChatClientRequest request) {
-		for (Message msg : request.prompt().getInstructions()) {
-			if (msg instanceof UserMessage) {
-				return msg.getText();
+		List<Message> all = request.prompt().getInstructions();
+		// Use the last UserMessage — in multi-turn chats with ChatMemory, earlier
+		// UserMessages are prior turns. Consistent with extractHistory's exclusion.
+		for (int i = all.size() - 1; i >= 0; i--) {
+			if (all.get(i) instanceof UserMessage) {
+				return all.get(i).getText();
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Convert all messages in {@code request.prompt().getInstructions()} — except the
+	 * final {@code UserMessage}, which is emitted separately as the current user prompt —
+	 * into the ADOT body-message shape so they can be attached to {@code input.messages}.
+	 * System messages, prior user/assistant turns (spliced in by a {@code ChatMemory}
+	 * advisor), and {@code ToolResponseMessage} entries are included. Any intermediate
+	 * {@code AssistantMessage.toolCalls} from the current turn are not visible here, see
+	 * design doc Extension 5.1.
+	 */
+	private List<Map<String, Object>> extractHistory(ChatClientRequest request) {
+		List<Message> all = request.prompt().getInstructions();
+		int lastUserIdx = -1;
+		for (int i = all.size() - 1; i >= 0; i--) {
+			if (all.get(i) instanceof UserMessage) {
+				lastUserIdx = i;
+				break;
+			}
+		}
+		List<Map<String, Object>> out = new ArrayList<>();
+		for (int i = 0; i < all.size(); i++) {
+			if (i == lastUserIdx) {
+				continue;
+			}
+			Message msg = all.get(i);
+			if (msg instanceof SystemMessage sm) {
+				out.add(Map.of("role", "system", "content", sm.getText()));
+			}
+			else if (msg instanceof UserMessage um) {
+				out.add(Map.of("role", "user", "content", um.getText()));
+			}
+			else if (msg instanceof AssistantMessage am) {
+				String text = am.getText();
+				out.add(Map.of("role", "assistant", "content", text != null ? text : ""));
+			}
+			else if (msg instanceof ToolResponseMessage trm) {
+				for (ToolResponseMessage.ToolResponse tr : trm.getResponses()) {
+					out.add(Map.of("role", "tool", "content", Map.of("name", tr.name(), "result", tr.responseData())));
+				}
+			}
+		}
+		return out;
 	}
 
 	// ChatResponse.getResult() is declared non-null by Spring AI's @NonNullApi package

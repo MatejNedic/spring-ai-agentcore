@@ -34,10 +34,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param sampleRate sampling rate for evaluations (0.0-1.0, default: 1.0 = evaluate all).
  * Boxed so that {@code null} means "not set" and we apply the intended default; a
  * primitive {@code double} would silently default to {@code 0.0} (skip everything).
+ * @param includeHistory when {@code true}, the advisor includes prior messages from
+ * {@code request.prompt().getInstructions()} (system messages, previous user/assistant
+ * turns, any tool-response messages visible to the advisor) in the span body's
+ * {@code input.messages} array, alongside the current user prompt. Default: {@code false}
+ * — preserves the single-message baseline wire shape verified against the Evaluate API.
+ * Opt-in because the multi-message payload grows with conversation length; long sessions
+ * at high sample rates produce O(n²) bytes on the wire.
  */
 @ConfigurationProperties(AgentCoreEvaluationProperties.CONFIG_PREFIX)
 public record AgentCoreEvaluationProperties(boolean enabled, String region, List<String> evaluatorIds, Boolean async,
-		Boolean metricsEnabled, Double sampleRate) {
+		Boolean metricsEnabled, Double sampleRate, Boolean includeHistory) {
 
 	public static final String CONFIG_PREFIX = "spring.ai.agentcore.evaluations";
 
@@ -55,6 +62,9 @@ public record AgentCoreEvaluationProperties(boolean enabled, String region, List
 		}
 		if (sampleRate == null || sampleRate < 0.0 || sampleRate > 1.0) {
 			sampleRate = 1.0;
+		}
+		if (includeHistory == null) {
+			includeHistory = Boolean.FALSE;
 		}
 	}
 

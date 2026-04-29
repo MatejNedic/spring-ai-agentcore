@@ -100,6 +100,7 @@ public class AgentCoreEvaluationAutoConfiguration {
 			.evaluatorIds(properties.evaluatorIds())
 			.async(properties.async())
 			.sampleRate(properties.sampleRate())
+			.includeHistory(properties.includeHistory())
 			.executor(executor);
 
 		metrics.ifPresent(builder::metrics);

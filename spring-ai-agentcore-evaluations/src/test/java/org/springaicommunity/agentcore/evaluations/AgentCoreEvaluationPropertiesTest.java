@@ -24,29 +24,34 @@ class AgentCoreEvaluationPropertiesTest {
 
 	@Test
 	void unsetDefaultsMatchDocumentedValues() {
-		AgentCoreEvaluationProperties props = new AgentCoreEvaluationProperties(true, null, null, null, null, null);
+		AgentCoreEvaluationProperties props = new AgentCoreEvaluationProperties(true, null, null, null, null, null,
+				null);
 
 		assertThat(props.evaluatorIds()).isEqualTo(AgentCoreEvaluationProperties.DEFAULT_EVALUATOR_IDS);
 		assertThat(props.async()).isTrue();
 		assertThat(props.metricsEnabled()).isTrue();
 		assertThat(props.sampleRate()).isEqualTo(1.0);
+		assertThat(props.includeHistory()).isFalse();
 	}
 
 	@Test
 	void explicitValuesAreHonoured() {
 		AgentCoreEvaluationProperties props = new AgentCoreEvaluationProperties(true, "us-west-2", null, false, false,
-				0.25);
+				0.25, true);
 
 		assertThat(props.async()).isFalse();
 		assertThat(props.metricsEnabled()).isFalse();
 		assertThat(props.sampleRate()).isEqualTo(0.25);
 		assertThat(props.region()).isEqualTo("us-west-2");
+		assertThat(props.includeHistory()).isTrue();
 	}
 
 	@Test
 	void outOfRangeSampleRateFallsBackToOne() {
-		assertThat(new AgentCoreEvaluationProperties(true, null, null, null, null, -0.5).sampleRate()).isEqualTo(1.0);
-		assertThat(new AgentCoreEvaluationProperties(true, null, null, null, null, 1.5).sampleRate()).isEqualTo(1.0);
+		assertThat(new AgentCoreEvaluationProperties(true, null, null, null, null, -0.5, null).sampleRate())
+			.isEqualTo(1.0);
+		assertThat(new AgentCoreEvaluationProperties(true, null, null, null, null, 1.5, null).sampleRate())
+			.isEqualTo(1.0);
 	}
 
 }
