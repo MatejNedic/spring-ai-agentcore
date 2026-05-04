@@ -29,28 +29,24 @@ public class ChatController {
 	}
 
 	@PostMapping("/chat")
-	public Map<String, String> chat(@RequestBody Map<String, String> request, @AuthenticationPrincipal Jwt jwt) {
-		String workloadAccessToken = identityTemplate.getWorkloadAccessTokenForJwt(jwt.getTokenValue(), workloadName);
-
-		return Map.of("workloadAccessToken", workloadAccessToken, "user", jwt.getSubject(), "message",
-				request.getOrDefault("message", ""));
+	public String chat(@RequestBody Map<String, String> request, @AuthenticationPrincipal Jwt jwt) {
+		identityTemplate.getWorkloadAccessTokenForJwt(jwt.getTokenValue(), workloadName);
+		return "successfully retrieved workload access token";
 	}
 
 	@PostMapping("/api-key")
-	public Map<String, String> apiKey(@AuthenticationPrincipal Jwt jwt) {
+	public String apiKey(@AuthenticationPrincipal Jwt jwt) {
 		String workloadAccessToken = identityTemplate.getWorkloadAccessTokenForJwt(jwt.getTokenValue(), workloadName);
-		String apiKey = identityTemplate.getApiKey(workloadAccessToken, resourceCredentialProviderName);
-
-		return Map.of("apiKey", apiKey, "user", jwt.getSubject());
+		identityTemplate.getApiKey(workloadAccessToken, resourceCredentialProviderName);
+		return "successfully retrieved api key";
 	}
 
 	@PostMapping("/oauth-token")
-	public Map<String, String> oauthToken(@AuthenticationPrincipal Jwt jwt) {
+	public String oauthToken(@AuthenticationPrincipal Jwt jwt) {
 		String workloadAccessToken = identityTemplate.getWorkloadAccessTokenForJwt(jwt.getTokenValue(), workloadName);
-		String oauthToken = identityTemplate.getOauthToken(c -> c.workloadIdentityToken(workloadAccessToken)
+		identityTemplate.getOauthToken(c -> c.workloadIdentityToken(workloadAccessToken)
 			.resourceCredentialProviderName(resourceCredentialProviderName));
-
-		return Map.of("oauthToken", oauthToken, "user", jwt.getSubject());
+		return "successfully retrieved oauth token";
 	}
 
 }

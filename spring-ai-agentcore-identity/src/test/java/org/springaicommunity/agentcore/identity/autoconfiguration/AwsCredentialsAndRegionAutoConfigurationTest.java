@@ -31,7 +31,7 @@ class AwsCredentialsAndRegionAutoConfigurationTest {
 
 	@Test
 	void createsRegionProviderWithConfiguredRegion() {
-		this.contextRunner.withPropertyValues("spring.agent-core.credentials.region=eu-west-1").run(context -> {
+		this.contextRunner.withPropertyValues("agentcore.identity.region=eu-west-1").run(context -> {
 			assertThat(context).hasSingleBean(AwsRegionProvider.class);
 			assertThat(context.getBean(AwsRegionProvider.class).getRegion()).isEqualTo(Region.EU_WEST_1);
 		});
@@ -40,8 +40,7 @@ class AwsCredentialsAndRegionAutoConfigurationTest {
 	@Test
 	void createsCredentialsProviderWithStaticCredentials() {
 		this.contextRunner
-			.withPropertyValues("spring.agent-core.credentials.access-key=testKey",
-					"spring.agent-core.credentials.secret-key=testSecret")
+			.withPropertyValues("agentcore.identity.access-key=testKey", "agentcore.identity.secret-key=testSecret")
 			.run(context -> {
 				assertThat(context).hasSingleBean(AwsCredentialsProvider.class);
 				var creds = context.getBean(AwsCredentialsProvider.class).resolveCredentials();

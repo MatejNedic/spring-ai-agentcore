@@ -30,7 +30,7 @@ import java.time.Duration;
 @ConfigurationProperties(AgentCoreIdentityAwsProperties.CONFIG_PREFIX)
 public class AgentCoreIdentityAwsProperties {
 
-	public static final String CONFIG_PREFIX = "spring.agent-core.identity";
+	public static final String CONFIG_PREFIX = "agentcore.identity";
 
 	/**
 	 * AWS region to use. Defaults to us-east-1.

@@ -28,9 +28,8 @@ class AwsAgentCoreIdentityAutoConfigurationTest {
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(AwsCredentialsAndRegionAutoConfiguration.class,
 				AwsAgentCoreIdentityAutoConfiguration.class))
-		.withPropertyValues("spring.agent-core.credentials.access-key=test",
-				"spring.agent-core.credentials.secret-key=test",
-				"spring.agent-core.credentials.endpoint=http://localhost:4566");
+		.withPropertyValues("agentcore.identity.access-key=test", "agentcore.identity.secret-key=test",
+				"agentcore.identity.endpoint=http://localhost:4566");
 
 	@Test
 	void createsBedrockAgentCoreClient() {
