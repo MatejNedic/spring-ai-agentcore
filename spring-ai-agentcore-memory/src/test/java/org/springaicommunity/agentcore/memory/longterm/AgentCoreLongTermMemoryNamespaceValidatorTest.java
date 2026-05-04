@@ -56,7 +56,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - no exception
 		validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()));
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())));
 	}
 
 	@Test
@@ -72,7 +72,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - no exception
 		validator.validateNamespaces("test-memory",
-				Map.of("summary-456", AgentCoreLongTermMemoryNamespace.SESSION.getPattern()));
+				Map.of("summary-456", List.of(AgentCoreLongTermMemoryNamespace.SESSION.getPattern())));
 	}
 
 	@Test
@@ -88,7 +88,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())))
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("Namespace mismatch")
 			.hasMessageContaining("semantic-123")
@@ -103,7 +103,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())))
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("no strategies configured");
 	}
@@ -121,7 +121,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())))
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("not found")
 			.hasMessageContaining("semantic-123");
@@ -137,7 +137,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())))
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("no namespaces configured");
 	}
@@ -162,7 +162,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - should match ACTOR pattern despite having resolved strategyId
 		validator.validateNamespaces("test-memory",
-				Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()));
+				Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())));
 	}
 
 	@Test
@@ -178,7 +178,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - should match SESSION pattern
 		validator.validateNamespaces("test-memory",
-				Map.of("summary-456", AgentCoreLongTermMemoryNamespace.SESSION.getPattern()));
+				Map.of("summary-456", List.of(AgentCoreLongTermMemoryNamespace.SESSION.getPattern())));
 	}
 
 	@Test
@@ -194,7 +194,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 		mockGetMemoryResponse(List.of(strategy));
 
 		// When/Then - should pass when config matches AWS
-		validator.validateNamespaces("test-memory", Map.of("summary-123", customPattern));
+		validator.validateNamespaces("test-memory", Map.of("summary-123", List.of(customPattern)));
 	}
 
 	@Test
@@ -211,7 +211,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - should fail because patterns don't match
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("summary-123", AgentCoreLongTermMemoryNamespace.SESSION.getPattern())))
+				Map.of("summary-123", List.of(AgentCoreLongTermMemoryNamespace.SESSION.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("Namespace mismatch")
 			.hasMessageContaining("custom-namespace");
@@ -230,7 +230,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 		// When/Then - should fail because missing /sessions/{sessionId}
 		assertThatThrownBy(() -> validator.validateNamespaces("test-memory",
-				Map.of("summary-456", AgentCoreLongTermMemoryNamespace.SESSION.getPattern())))
+				Map.of("summary-456", List.of(AgentCoreLongTermMemoryNamespace.SESSION.getPattern()))))
 			.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 			.hasMessageContaining("Namespace mismatch");
 	}
@@ -273,7 +273,8 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 			String expectedPattern = AgentCoreLongTermMemoryNamespace.ACTOR.getPattern();
 
 			// When
-			validatorWithAutoRegister.validateNamespaces("test-memory", Map.of("semantic-123", expectedPattern));
+			validatorWithAutoRegister.validateNamespaces("test-memory",
+					Map.of("semantic-123", List.of(expectedPattern)));
 
 			// Then
 			verify(registrar).registerNamespace("test-memory", "semantic-123", expectedPattern);
@@ -291,7 +292,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 			// When
 			validatorWithAutoRegister.validateNamespaces("test-memory",
-					Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()));
+					Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())));
 
 			// Then
 			verify(registrar, never()).registerNamespace(any(), any(), any());
@@ -309,7 +310,7 @@ class AgentCoreLongTermMemoryNamespaceValidatorTest {
 
 			// When/Then
 			assertThatThrownBy(() -> validatorWithoutAutoRegister.validateNamespaces("test-memory",
-					Map.of("semantic-123", AgentCoreLongTermMemoryNamespace.ACTOR.getPattern())))
+					Map.of("semantic-123", List.of(AgentCoreLongTermMemoryNamespace.ACTOR.getPattern()))))
 				.isInstanceOf(AgentCoreMemoryException.ConfigurationException.class)
 				.hasMessageContaining("Namespace mismatch");
 

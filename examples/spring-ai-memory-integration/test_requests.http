@@ -1,4 +1,8 @@
-### Tell name - STM
+### ============================================================================
+### Short-term memory (ChatMemory-backed, conversation id: testActor:testSession)
+### ============================================================================
+
+### STM — tell name
 POST http://localhost:8080/api/short
 Content-Type: application/json
 
@@ -6,7 +10,7 @@ Content-Type: application/json
   "message": "My name is Andrei"
 }
 
-### Ask name - STM
+### STM — ask name
 POST http://localhost:8080/api/short
 Content-Type: application/json
 
@@ -14,7 +18,11 @@ Content-Type: application/json
   "message": "What is my name?"
 }
 
-### Tell name - LTM
+### ============================================================================
+### Long-term memory (AgentCore Memory, persisted across sessions)
+### ============================================================================
+
+### LTM — tell name
 POST http://localhost:8080/api/long
 Content-Type: application/json
 
@@ -22,7 +30,7 @@ Content-Type: application/json
   "message": "My name is Andrei"
 }
 
-### Ask name - LTM
+### LTM — ask name
 POST http://localhost:8080/api/long
 Content-Type: application/json
 
@@ -30,12 +38,35 @@ Content-Type: application/json
   "message": "What is my name?"
 }
 
+### LTM — write a fact (ingestion to LTM may take ~1 minute on the AWS side)
+POST http://localhost:8080/api/long
+Content-Type: application/json
 
-### Get history
+{
+  "message": "My favorite color is green. Please remember this."
+}
+
+### LTM — recall the fact (run after giving AWS a minute to extract)
+POST http://localhost:8080/api/long
+Content-Type: application/json
+
+{
+  "message": "What is my favorite color? One word."
+}
+
+### ============================================================================
+### Conversation history (STM buffer inspection / reset)
+### ============================================================================
+
+### Get STM history
 GET http://localhost:8080/api/history
 
-### Clear history
+### Clear STM history
 DELETE http://localhost:8080/api/history
 
-### Get Memories
-GET http://localhost:8080/api/memories
+### ============================================================================
+### Diagnostics
+### ============================================================================
+
+### List wired-up LTM strategies (in retrieval order)
+GET http://localhost:8080/api/ltm/strategies

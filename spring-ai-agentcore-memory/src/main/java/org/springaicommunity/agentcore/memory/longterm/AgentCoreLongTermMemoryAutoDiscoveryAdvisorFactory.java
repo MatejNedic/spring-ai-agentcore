@@ -16,16 +16,26 @@
 
 package org.springaicommunity.agentcore.memory.longterm;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.memory.AgentCoreMemoryException;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryStrategyDiscovery.DiscoveredStrategy;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.springaicommunity.agentcore.memory.longterm.strategy.EpisodicMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.MemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.SemanticMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.SummaryMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.UserPreferenceMemoryStrategyHandler;
 
 /**
- * Factory for creating LTM advisors from autodiscovered strategies.
+ * Factory for creating LTM advisors from auto-discovered strategies.
+ *
+ * <p>
+ * For each discovered strategy, picks the matching built-in handler class and builds an
+ * advisor wrapping it. When explicit configuration for the same {@code strategyId} is
+ * present, it wins; otherwise the discovered namespaces are used as defaults.
  *
  * @author Andrei Shakirin
  */
@@ -61,45 +71,88 @@ class AgentCoreLongTermMemoryAutoDiscoveryAdvisorFactory {
 	}
 
 	private AgentCoreLongTermMemoryAdvisor createAdvisor(DiscoveredStrategy discovered) {
-		MemoryStrategiesMap.StrategyLabel strategyLabel = MemoryStrategiesMap.LABELS.get(discovered.type());
-		AgentCoreLongTermMemoryStrategy explicitConfig = getExplicitConfig(discovered);
-
+		AgentCoreLongTermMemoryStrategyType strategy = discovered.type();
+		AgentCoreLongTermMemoryStrategy explicitConfig = config.byKind(strategy);
 		boolean configMatches = explicitConfig != null && discovered.strategyId().equals(explicitConfig.strategyId());
-		String namespace = resolveNamespace(discovered, configMatches ? explicitConfig : null);
-		Integer topK = configMatches ? getTopK(explicitConfig) : null;
+		AgentCoreLongTermMemoryStrategy effectiveExplicit = configMatches ? explicitConfig : null;
 
-		var builder = AgentCoreLongTermMemoryAdvisor.builder(retriever, strategyLabel.strategy())
-			.strategyId(discovered.strategyId())
-			.contextLabel(strategyLabel.contextLabel())
-			.namespacePattern(namespace);
+		String namespace = resolveNamespace(discovered, effectiveExplicit);
+		MemoryStrategyHandler handler = buildHandler(discovered, effectiveExplicit, namespace, strategy.contextLabel());
 
-		if (topK != null) {
-			builder.topK(topK);
-		}
-
-		return builder.build();
+		return AgentCoreLongTermMemoryAdvisor.builder(retriever).memoryStrategy(strategy).handler(handler).build();
 	}
 
-	private AgentCoreLongTermMemoryStrategy getExplicitConfig(DiscoveredStrategy discovered) {
+	private MemoryStrategyHandler buildHandler(DiscoveredStrategy discovered,
+			AgentCoreLongTermMemoryStrategy explicitConfig, String namespace, String contextLabel) {
 		return switch (discovered.type()) {
-			case SEMANTIC -> config.semantic();
-			case USER_PREFERENCE -> config.userPreference();
-			case SUMMARY -> config.summary();
-			case EPISODIC -> config.episodic();
+			case SEMANTIC -> {
+				var b = SemanticMemoryStrategyHandler.builder()
+					.strategyId(discovered.strategyId())
+					.namespacePattern(namespace)
+					.contextLabel(contextLabel);
+				if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Semantic s) {
+					b.topK(s.topK());
+				}
+				yield b.build();
+			}
+			case USER_PREFERENCE -> UserPreferenceMemoryStrategyHandler.builder()
+				.strategyId(discovered.strategyId())
+				.namespacePattern(namespace)
+				.contextLabel(contextLabel)
+				.build();
+			case SUMMARY -> {
+				var b = SummaryMemoryStrategyHandler.builder()
+					.strategyId(discovered.strategyId())
+					.namespacePattern(namespace)
+					.contextLabel(contextLabel);
+				if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Summary s) {
+					b.topK(s.topK());
+				}
+				yield b.build();
+			}
+			case EPISODIC -> buildEpisodicHandler(discovered, explicitConfig, namespace);
+			case CUSTOM -> throw new IllegalStateException(
+					"Auto-discovery should never produce CUSTOM; AgentCoreLongTermMemoryStrategyType.fromAwsType filters it out.");
 		};
 	}
 
-	private Integer getTopK(AgentCoreLongTermMemoryStrategy explicitConfig) {
-		if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Episodic e) {
-			return e.episodesTopK();
+	private EpisodicMemoryStrategyHandler buildEpisodicHandler(DiscoveredStrategy discovered,
+			AgentCoreLongTermMemoryStrategy explicitConfig, String namespace) {
+		var b = EpisodicMemoryStrategyHandler.builder().strategyId(discovered.strategyId()).namespacePattern(namespace);
+
+		if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Episodic episodicExplicit) {
+			b.episodesTopK(episodicExplicit.episodesTopK());
+			b.reflectionsTopK(episodicExplicit.reflectionsTopK());
+
+			String explicitReflectionsPattern = episodicExplicit.resolveReflectionsNamespacePattern();
+			if (explicitReflectionsPattern != null) {
+				b.reflectionsNamespacePattern(explicitReflectionsPattern);
+				logger.debug("Strategy '{}': using configured reflections namespace '{}'", discovered.strategyId(),
+						explicitReflectionsPattern);
+			}
+			else if (episodicExplicit.usesLegacyReflectionsStrategy()) {
+				b.reflectionsStrategyId(episodicExplicit.reflectionsStrategyId());
+				logger.debug("Strategy '{}': using deprecated reflectionsStrategyId '{}'", discovered.strategyId(),
+						episodicExplicit.reflectionsStrategyId());
+			}
+			else {
+				applyDiscoveredReflections(b, discovered);
+			}
 		}
-		else if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Semantic s) {
-			return s.topK();
+		else {
+			applyDiscoveredReflections(b, discovered);
 		}
-		else if (explicitConfig instanceof AgentCoreLongTermMemoryProperties.Summary s) {
-			return s.topK();
+
+		return b.build();
+	}
+
+	private void applyDiscoveredReflections(EpisodicMemoryStrategyHandler.Builder b, DiscoveredStrategy discovered) {
+		String discoveredReflections = discovered.defaultReflectionsNamespace();
+		if (discoveredReflections != null) {
+			b.reflectionsNamespacePattern(discoveredReflections);
+			logger.debug("Strategy '{}': using discovered reflections namespace '{}'", discovered.strategyId(),
+					discoveredReflections);
 		}
-		return null;
 	}
 
 	private String resolveNamespace(DiscoveredStrategy discovered, AgentCoreLongTermMemoryStrategy explicitConfig) {
