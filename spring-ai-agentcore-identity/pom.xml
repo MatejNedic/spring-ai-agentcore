@@ -26,6 +26,12 @@
            <artifactId>spring-boot-autoconfigure</artifactId>
        </dependency>
        <dependency>
+           <groupId>org.springaicommunity</groupId>
+           <artifactId>spring-ai-agentcore-runtime-starter</artifactId>
+           <version>${project.version}</version>
+           <optional>true</optional>
+       </dependency>
+       <dependency>
            <groupId>software.amazon.awssdk</groupId>
            <artifactId>bedrockagentcore</artifactId>
        </dependency>

@@ -62,7 +62,6 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 	public AwsCredentialsProvider credentialsProvider(AgentCoreIdentityAwsProperties properties) {
 		List<AwsCredentialsProvider> providers = new ArrayList<>();
 
-
 		if (StringUtils.hasText(properties.getAccessKey()) && StringUtils.hasText(properties.getSecretKey())) {
 			providers.add(createStaticCredentialsProvider(properties));
 		}
@@ -75,7 +74,6 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 		if (profile != null && profile.getName() != null) {
 			providers.add(createProfileCredentialProvider(profile));
 		}
-
 
 		if (providers.isEmpty()) {
 			return DefaultCredentialsProvider.builder().build();
@@ -95,8 +93,6 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 		}
 		return builder.build();
 	}
-
-
 
 	private AwsCredentialsProvider createStaticCredentialsProvider(AgentCoreIdentityAwsProperties properties) {
 		if (StringUtils.hasText(properties.getSessionToken())) {

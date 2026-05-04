@@ -32,6 +32,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -176,6 +177,45 @@ class AgentCoreIdentityTemplateTest {
 	void completeResourceTokenAuthForUserIdRejectsEmptyUserId() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> this.template.completeResourceTokenAuthForUserId("uri", ""));
+	}
+
+	@Test
+	void getApiKeyWithResourceNameUsesHolder() {
+		WorkloadAccessTokenHolder holder = new WorkloadAccessTokenHolder();
+		holder.set("thread-local-token");
+		AgentCoreIdentityTemplate templateWithHolder = new AgentCoreIdentityTemplate(this.client, holder);
+
+		when(this.client.getResourceApiKey(any(Consumer.class)))
+			.thenReturn(GetResourceApiKeyResponse.builder().apiKey("key-from-holder").build());
+
+		String apiKey = templateWithHolder.getApiKey("my-provider");
+		assertThat(apiKey).isEqualTo("key-from-holder");
+		holder.clear();
+	}
+
+	@Test
+	void getApiKeyWithResourceNameThrowsWhenNoHolder() {
+		assertThatIllegalStateException().isThrownBy(() -> this.template.getApiKey("provider"))
+			.withMessageContaining("WorkloadAccessTokenHolder is not configured");
+	}
+
+	@Test
+	void getApiKeyWithResourceNameThrowsWhenNoToken() {
+		WorkloadAccessTokenHolder holder = new WorkloadAccessTokenHolder();
+		AgentCoreIdentityTemplate templateWithHolder = new AgentCoreIdentityTemplate(this.client, holder);
+
+		assertThatIllegalStateException().isThrownBy(() -> templateWithHolder.getApiKey("provider"))
+			.withMessageContaining("No workload access token available");
+	}
+
+	@Test
+	void getApiKeyWithResourceNameRejectsEmptyResourceName() {
+		WorkloadAccessTokenHolder holder = new WorkloadAccessTokenHolder();
+		holder.set("token");
+		AgentCoreIdentityTemplate templateWithHolder = new AgentCoreIdentityTemplate(this.client, holder);
+
+		assertThatIllegalArgumentException().isThrownBy(() -> templateWithHolder.getApiKey(""));
+		holder.clear();
 	}
 
 }

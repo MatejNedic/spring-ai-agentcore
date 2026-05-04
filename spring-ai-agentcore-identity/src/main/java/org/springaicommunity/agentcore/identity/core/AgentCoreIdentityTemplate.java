@@ -17,6 +17,7 @@ package org.springaicommunity.agentcore.identity.core;
 
 import java.util.function.Consumer;
 
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
@@ -40,9 +41,17 @@ public class AgentCoreIdentityTemplate {
 
 	private final BedrockAgentCoreClient client;
 
+	private final @Nullable WorkloadAccessTokenHolder workloadAccessTokenHolder;
+
 	public AgentCoreIdentityTemplate(BedrockAgentCoreClient client) {
+		this(client, null);
+	}
+
+	public AgentCoreIdentityTemplate(BedrockAgentCoreClient client,
+			@Nullable WorkloadAccessTokenHolder workloadAccessTokenHolder) {
 		Assert.notNull(client, "BedrockAgentCoreClient must not be null");
 		this.client = client;
+		this.workloadAccessTokenHolder = workloadAccessTokenHolder;
 	}
 
 	/**
@@ -104,6 +113,25 @@ public class AgentCoreIdentityTemplate {
 				.resourceCredentialProviderName(resourceName)
 				.build())
 			.apiKey();
+	}
+
+	/**
+	 * Retrieves an API key using the workload access token automatically captured from
+	 * the AgentCore Runtime invocation headers. Requires the runtime starter on the
+	 * classpath and a {@link WorkloadAccessTokenHolder} to be configured.
+	 * @param resourceName the name of the API key credential provider
+	 * @return the API key stored in the vault
+	 * @throws IllegalStateException if no {@link WorkloadAccessTokenHolder} is configured
+	 * or no token is available on the current thread
+	 */
+	public String getApiKey(String resourceName) {
+		Assert.hasText(resourceName, "resourceName must not be null or empty");
+		Assert.state(this.workloadAccessTokenHolder != null,
+				"WorkloadAccessTokenHolder is not configured. Add the runtime starter dependency.");
+		String token = this.workloadAccessTokenHolder.get();
+		Assert.state(token != null, "No workload access token available on the current thread. "
+				+ "Ensure this method is called within an @AgentCoreInvocation context.");
+		return getApiKey(token, resourceName);
 	}
 
 	/**

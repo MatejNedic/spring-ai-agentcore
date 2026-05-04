@@ -30,9 +30,13 @@ public class AgentCoreMethodInvoker {
 
 	private final AgentCoreMethodRegistry registry;
 
-	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry) {
+	private final AgentCoreInvocationCallbackRegistry callbackRegistry;
+
+	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry,
+			AgentCoreInvocationCallbackRegistry callbackRegistry) {
 		this.objectMapper = objectMapper;
 		this.registry = registry;
+		this.callbackRegistry = callbackRegistry;
 	}
 
 	public Object invokeAgentMethod(Object request, HttpHeaders headers) throws Exception {
@@ -40,21 +44,30 @@ public class AgentCoreMethodInvoker {
 			throw new AgentCoreInvocationException("No @AgentCoreInvocation method found");
 		}
 
-		var method = registry.getAgentMethod();
-		var bean = registry.getAgentBean();
-		var paramTypes = method.getParameterTypes();
-
-		Object[] args = prepareArguments(request, headers, paramTypes);
-
 		try {
-			return method.invoke(bean, args);
-		}
-
-		catch (InvocationTargetException e) {
-			if (e.getCause() instanceof Exception exception) {
-				throw exception;
+			for (AgentCoreInvocationCallback callback : this.callbackRegistry.getCallbacks()) {
+				callback.beforeInvocation(request, headers);
 			}
-			throw new AgentCoreInvocationException("Method invocation failed", e);
+			var method = registry.getAgentMethod();
+			var bean = registry.getAgentBean();
+			var paramTypes = method.getParameterTypes();
+
+			Object[] args = prepareArguments(request, headers, paramTypes);
+
+			try {
+				return method.invoke(bean, args);
+			}
+			catch (InvocationTargetException e) {
+				if (e.getCause() instanceof Exception exception) {
+					throw exception;
+				}
+				throw new AgentCoreInvocationException("Method invocation failed", e);
+			}
+		}
+		finally {
+			for (AgentCoreInvocationCallback callback : this.callbackRegistry.getCallbacks()) {
+				callback.afterInvocation(request, headers);
+			}
 		}
 	}
 

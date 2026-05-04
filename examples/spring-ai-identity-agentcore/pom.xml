@@ -5,46 +5,31 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.0</version>
-        <relativePath/>
+        <groupId>org.springaicommunity.examples</groupId>
+        <artifactId>spring-ai-agentcore-examples</artifactId>
+        <version>1.1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>org.springaicommunity.examples</groupId>
     <artifactId>spring-ai-identity-agentcore</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
-
     <name>Spring AI Identity AgentCore Example</name>
     <description>AgentCore Runtime chat with Cognito JWT exchange via AgentCoreIdentityTemplate</description>
-
-    <properties>
-        <java.version>17</java.version>
-        <spring-ai.version>1.1.1</spring-ai.version>
-    </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agentcore-runtime-starter</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
         </dependency>
-
         <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agentcore-identity</artifactId>
-            <version>1.1.0-SNAPSHOT</version>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-bedrock-converse</artifactId>
-            <version>${spring-ai.version}</version>
         </dependency>
     </dependencies>
 

@@ -23,24 +23,27 @@ import org.springframework.lang.Nullable;
  * @author Matej Nedic
  */
 public class Profile {
-    @Nullable
-    private String name;
-    @Nullable
-    private String path;
 
-    public String getName() {
-        return name;
-    }
+	@Nullable
+	private String name;
 
-    public void setName(String name) {
-        this.name = name;
-    }
+	@Nullable
+	private String path;
 
-    public String getPath() {
-        return path;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public void setPath(String path) {
-        this.path = path;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getPath() {
+		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
+	}
+
 }

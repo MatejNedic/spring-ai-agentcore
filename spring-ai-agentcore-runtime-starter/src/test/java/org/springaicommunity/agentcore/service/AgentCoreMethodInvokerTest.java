@@ -46,7 +46,8 @@ class AgentCoreMethodInvokerTest {
 
 	@BeforeEach
 	void setUp() {
-		invoker = new AgentCoreMethodInvoker(mockObjectMapper, mockRegistry);
+		invoker = new AgentCoreMethodInvoker(mockObjectMapper, mockRegistry,
+				new AgentCoreInvocationCallbackRegistry(null));
 		testRequest = "test prompt";
 	}
 

@@ -186,4 +186,5 @@ public class AgentCoreIdentityAwsProperties {
 	public void setProfile(Profile profile) {
 		this.profile = profile;
 	}
+
 }
