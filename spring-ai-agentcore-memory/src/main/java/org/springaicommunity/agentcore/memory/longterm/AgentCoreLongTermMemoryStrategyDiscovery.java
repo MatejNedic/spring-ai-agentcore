@@ -23,9 +23,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import software.amazon.awssdk.services.bedrockagentcorecontrol.BedrockAgentCoreControlClient;
+import software.amazon.awssdk.services.bedrockagentcorecontrol.model.EpisodicReflectionConfiguration;
 import software.amazon.awssdk.services.bedrockagentcorecontrol.model.GetMemoryRequest;
 import software.amazon.awssdk.services.bedrockagentcorecontrol.model.MemoryStrategy;
 import software.amazon.awssdk.services.bedrockagentcorecontrol.model.MemoryStrategyType;
+import software.amazon.awssdk.services.bedrockagentcorecontrol.model.ReflectionConfiguration;
+import software.amazon.awssdk.services.bedrockagentcorecontrol.model.StrategyConfiguration;
 
 /**
  * Discovers memory strategies from AgentCore Memory for autodiscovery mode.
@@ -59,17 +62,39 @@ public class AgentCoreLongTermMemoryStrategyDiscovery {
 		}
 
 		List<DiscoveredStrategy> discovered = new ArrayList<>();
+		int skipped = 0;
 		for (MemoryStrategy strategy : strategies) {
 			var mapped = mapStrategy(strategy);
 			if (mapped != null) {
 				discovered.add(mapped);
-				logger.info("Discovered strategy: {} (type={}, namespaces={})", mapped.strategyId(), mapped.type(),
-						mapped.namespaces());
+				logger.info("Discovered strategy: {} (type={}, namespaces={}, reflectionsNamespaces={})",
+						mapped.strategyId(), mapped.type(), mapped.namespaces(), mapped.reflectionsNamespaces());
+			}
+			else {
+				skipped++;
 			}
 		}
 
-		logger.info("Discovered {} strategies for memory: {}", discovered.size(), memoryId);
+		logDiscoveryOverview(memoryId, strategies.size(), discovered, skipped);
 		return discovered;
+	}
+
+	private void logDiscoveryOverview(String memoryId, int total, List<DiscoveredStrategy> discovered, int skipped) {
+		if (discovered.isEmpty()) {
+			logger.warn("Strategy discovery for memory {}: {} total, 0 usable, {} skipped", memoryId, total, skipped);
+			return;
+		}
+		StringBuilder table = new StringBuilder();
+		table.append(String.format("%n  Strategy discovery for memory '%s':%n", memoryId));
+		table.append(String.format("  %-20s %-45s %s%n", "TYPE", "STRATEGY ID", "REFLECTIONS"));
+		table.append("  ").append("-".repeat(80)).append(System.lineSeparator());
+		for (DiscoveredStrategy ds : discovered) {
+			String refl = ds.reflectionsNamespaces().isEmpty() ? "no" : "yes";
+			table.append(String.format("  %-20s %-45s %s%n", ds.type(), ds.strategyId(), refl));
+		}
+		table.append(String.format("  %d usable / %d total%s", discovered.size(), total,
+				skipped > 0 ? " (" + skipped + " skipped)" : ""));
+		logger.info(table.toString());
 	}
 
 	private DiscoveredStrategy mapStrategy(MemoryStrategy strategy) {
@@ -79,7 +104,7 @@ public class AgentCoreLongTermMemoryStrategyDiscovery {
 			return null;
 		}
 
-		StrategyType type = mapType(sdkType);
+		AgentCoreLongTermMemoryStrategyType type = AgentCoreLongTermMemoryStrategyType.fromAwsType(sdkType);
 		if (type == null) {
 			logger.warn("Unknown or unsupported strategy type '{}' for strategy '{}', skipping", sdkType,
 					strategy.strategyId());
@@ -92,40 +117,78 @@ public class AgentCoreLongTermMemoryStrategyDiscovery {
 			return null;
 		}
 
-		return new DiscoveredStrategy(strategy.strategyId(), type, List.copyOf(namespaces));
+		List<String> reflectionsNamespaces = type == AgentCoreLongTermMemoryStrategyType.EPISODIC
+				? extractReflectionsNamespaces(strategy) : List.of();
+
+		return new DiscoveredStrategy(strategy.strategyId(), type, List.copyOf(namespaces), reflectionsNamespaces);
 	}
 
-	private StrategyType mapType(MemoryStrategyType sdkType) {
-		return switch (sdkType) {
-			case SEMANTIC -> StrategyType.SEMANTIC;
-			case SUMMARIZATION -> StrategyType.SUMMARY;
-			case USER_PREFERENCE -> StrategyType.USER_PREFERENCE;
-			case EPISODIC -> StrategyType.EPISODIC;
-			case CUSTOM -> null; // Skip custom strategies
-			case UNKNOWN_TO_SDK_VERSION -> null;
-		};
+	/**
+	 * Walks the nullable {@link StrategyConfiguration} &rarr;
+	 * {@link ReflectionConfiguration} &rarr; {@link EpisodicReflectionConfiguration}
+	 * chain to extract reflection namespaces for an episodic strategy. Returns an empty
+	 * list when any link is missing or when the reflection variant is
+	 * {@code customReflectionConfiguration} (handled separately, not supported by
+	 * auto-discovery yet).
+	 */
+	private List<String> extractReflectionsNamespaces(MemoryStrategy strategy) {
+		StrategyConfiguration configuration = strategy.configuration();
+		if (configuration == null) {
+			return List.of();
+		}
+		ReflectionConfiguration reflection = configuration.reflection();
+		if (reflection == null) {
+			return List.of();
+		}
+		EpisodicReflectionConfiguration episodic = reflection.episodicReflectionConfiguration();
+		if (episodic == null) {
+			if (reflection.customReflectionConfiguration() != null) {
+				logger.info(
+						"Strategy '{}' uses customReflectionConfiguration; reflection-namespace auto-discovery "
+								+ "will skip this entry. Configure reflection explicitly via "
+								+ "agentcore.memory.long-term.episodic.reflections-namespace-pattern.",
+						strategy.strategyId());
+			}
+			return List.of();
+		}
+		List<String> reflectionNamespaces = episodic.namespaces();
+		return reflectionNamespaces != null ? List.copyOf(reflectionNamespaces) : List.of();
 	}
 
 	/**
 	 * Represents a discovered memory strategy.
+	 *
+	 * @param strategyId AWS strategy ID
+	 * @param type strategy type (semantic / summary / user-preference / episodic); never
+	 * {@code CUSTOM} because auto-discovery skips custom AWS strategies
+	 * @param namespaces namespaces registered on the strategy (episodes for episodic
+	 * strategies, primary namespace otherwise)
+	 * @param reflectionsNamespaces reflection namespaces registered on the strategy;
+	 * populated only for {@code EPISODIC} strategies that have a reflection
+	 * configuration, otherwise empty
 	 */
-	public record DiscoveredStrategy(String strategyId, StrategyType type, List<String> namespaces) {
+	public record DiscoveredStrategy(String strategyId, AgentCoreLongTermMemoryStrategyType type,
+			List<String> namespaces, List<String> reflectionsNamespaces) {
+
+		public DiscoveredStrategy {
+			namespaces = namespaces != null ? List.copyOf(namespaces) : List.of();
+			reflectionsNamespaces = reflectionsNamespaces != null ? List.copyOf(reflectionsNamespaces) : List.of();
+		}
 
 		/**
-		 * Returns the first namespace (default).
+		 * Returns the first namespace (default for episodes).
 		 */
 		public String defaultNamespace() {
 			return namespaces.get(0);
 		}
 
-	}
-
-	/**
-	 * Strategy types supported by autodiscovery.
-	 */
-	public enum StrategyType {
-
-		SEMANTIC, SUMMARY, USER_PREFERENCE, EPISODIC
+		/**
+		 * Returns the first reflections namespace, or {@code null} if none are
+		 * configured.
+		 */
+		public String defaultReflectionsNamespace() {
+			return reflectionsNamespaces.isEmpty() ? null : reflectionsNamespaces.get(0);
+		}
 
 	}
 

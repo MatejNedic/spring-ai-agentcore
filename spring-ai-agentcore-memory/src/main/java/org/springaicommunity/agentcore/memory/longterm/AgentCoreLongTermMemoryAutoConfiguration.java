@@ -16,6 +16,7 @@
 
 package org.springaicommunity.agentcore.memory.longterm;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +25,11 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.memory.AgentCoreMemoryProperties;
-import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryAdvisor.MemoryStrategy;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryStrategyDiscovery.DiscoveredStrategy;
-import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryStrategyDiscovery.StrategyType;
+import org.springaicommunity.agentcore.memory.longterm.strategy.EpisodicMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.SemanticMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.SummaryMemoryStrategyHandler;
+import org.springaicommunity.agentcore.memory.longterm.strategy.UserPreferenceMemoryStrategyHandler;
 import org.springaicommunity.agentcore.memory.shorttem.AgentCoreShortTermMemoryRepository;
 import org.springaicommunity.agentcore.memory.shorttem.AgentCoreShortTermMemoryRepositoryAutoConfiguration;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -57,6 +60,13 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreLongTermMemoryAutoConfiguration.class);
 
+	/**
+	 * Fires when either auto-discovery is on, or at least one explicit strategy id is
+	 * set. Inner classes look unused but are discovered reflectively by
+	 * {@link AnyNestedCondition} through their {@code @ConditionalOnProperty}
+	 * annotations.
+	 */
+	@SuppressWarnings("unused")
 	static class AnyStrategyConfiguredCondition extends AnyNestedCondition {
 
 		public AnyStrategyConfiguredCondition() {
@@ -130,14 +140,14 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 		String memoryId = memoryConfig.memoryId();
 
 		if (!longTermMemoryProperties.autoDiscovery()) {
-			Map<String, String> strategyConfigs = buildStrategyConfigs(longTermMemoryProperties);
-			if (!strategyConfigs.isEmpty()) {
+			Map<String, List<String>> namespacesByStrategy = collectNamespacesByStrategy(longTermMemoryProperties);
+			if (!namespacesByStrategy.isEmpty()) {
 				try (BedrockAgentCoreControlClient controlClient = controlClientFactory.get()) {
 					AgentCoreLongTermMemoryNamespaceRegistrar registrar = new AgentCoreLongTermMemoryNamespaceRegistrar(
 							controlClient);
 					AgentCoreLongTermMemoryNamespaceValidator validator = new AgentCoreLongTermMemoryNamespaceValidator(
 							controlClient, registrar, longTermMemoryProperties.namespace().autoRegister());
-					validator.validateNamespaces(memoryId, strategyConfigs);
+					validator.validateNamespaces(memoryId, namespacesByStrategy);
 				}
 			}
 		}
@@ -186,12 +196,16 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 			havingValue = "false", matchIfMissing = true)
 	AgentCoreLongTermMemoryAdvisor semanticAdvisor(AgentCoreLongTermMemoryRetriever retriever,
 			AgentCoreLongTermMemoryProperties config) {
-		var semanticConfig = config.semantic();
-		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.SEMANTIC)
-			.strategyId(semanticConfig.strategyId())
-			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.SEMANTIC))
-			.topK(semanticConfig.topK())
-			.namespacePattern(semanticConfig.resolveNamespacePattern())
+		var c = config.semantic();
+		var handler = SemanticMemoryStrategyHandler.builder()
+			.strategyId(c.strategyId())
+			.namespacePattern(c.resolveNamespacePattern())
+			.topK(c.topK())
+			.contextLabel(AgentCoreLongTermMemoryStrategyType.SEMANTIC.contextLabel())
+			.build();
+		return AgentCoreLongTermMemoryAdvisor.builder(retriever)
+			.memoryStrategy(AgentCoreLongTermMemoryStrategyType.SEMANTIC)
+			.handler(handler)
 			.build();
 	}
 
@@ -203,11 +217,15 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 			havingValue = "false", matchIfMissing = true)
 	AgentCoreLongTermMemoryAdvisor userPreferenceAdvisor(AgentCoreLongTermMemoryRetriever retriever,
 			AgentCoreLongTermMemoryProperties config) {
-		var prefConfig = config.userPreference();
-		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.USER_PREFERENCE)
-			.strategyId(prefConfig.strategyId())
-			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.USER_PREFERENCE))
-			.namespacePattern(prefConfig.resolveNamespacePattern())
+		var c = config.userPreference();
+		var handler = UserPreferenceMemoryStrategyHandler.builder()
+			.strategyId(c.strategyId())
+			.namespacePattern(c.resolveNamespacePattern())
+			.contextLabel(AgentCoreLongTermMemoryStrategyType.USER_PREFERENCE.contextLabel())
+			.build();
+		return AgentCoreLongTermMemoryAdvisor.builder(retriever)
+			.memoryStrategy(AgentCoreLongTermMemoryStrategyType.USER_PREFERENCE)
+			.handler(handler)
 			.build();
 	}
 
@@ -218,12 +236,16 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 			havingValue = "false", matchIfMissing = true)
 	AgentCoreLongTermMemoryAdvisor summaryAdvisor(AgentCoreLongTermMemoryRetriever retriever,
 			AgentCoreLongTermMemoryProperties config) {
-		var summaryConfig = config.summary();
-		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.SUMMARY)
-			.strategyId(summaryConfig.strategyId())
-			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.SUMMARY))
-			.topK(summaryConfig.topK())
-			.namespacePattern(summaryConfig.resolveNamespacePattern())
+		var c = config.summary();
+		var handler = SummaryMemoryStrategyHandler.builder()
+			.strategyId(c.strategyId())
+			.namespacePattern(c.resolveNamespacePattern())
+			.topK(c.topK())
+			.contextLabel(AgentCoreLongTermMemoryStrategyType.SUMMARY.contextLabel())
+			.build();
+		return AgentCoreLongTermMemoryAdvisor.builder(retriever)
+			.memoryStrategy(AgentCoreLongTermMemoryStrategyType.SUMMARY)
+			.handler(handler)
 			.build();
 	}
 
@@ -234,37 +256,71 @@ public class AgentCoreLongTermMemoryAutoConfiguration {
 			havingValue = "false", matchIfMissing = true)
 	AgentCoreLongTermMemoryAdvisor episodicAdvisor(AgentCoreLongTermMemoryRetriever retriever,
 			AgentCoreLongTermMemoryProperties config) {
-		var episodicConfig = config.episodic();
-		return AgentCoreLongTermMemoryAdvisor.builder(retriever, MemoryStrategy.EPISODIC)
-			.strategyId(episodicConfig.strategyId())
-			.reflectionsStrategyId(episodicConfig.reflectionsStrategyId())
-			.contextLabel(MemoryStrategiesMap.getContextLabel(StrategyType.EPISODIC))
-			.topK(episodicConfig.episodesTopK())
-			.reflectionsTopK(episodicConfig.reflectionsTopK())
-			.namespacePattern(episodicConfig.resolveNamespacePattern())
+		var c = config.episodic();
+		var handlerBuilder = EpisodicMemoryStrategyHandler.builder()
+			.strategyId(c.strategyId())
+			.namespacePattern(c.resolveNamespacePattern())
+			.episodesTopK(c.episodesTopK())
+			.reflectionsTopK(c.reflectionsTopK());
+
+		// Prefer the modern namespace-based path. Fall back to the deprecated
+		// separate-strategy path only when no namespace override is set.
+		String reflectionsPattern = c.resolveReflectionsNamespacePattern();
+		if (reflectionsPattern != null) {
+			handlerBuilder.reflectionsNamespacePattern(reflectionsPattern);
+		}
+		else if (c.reflectionsStrategyId() != null && !c.reflectionsStrategyId().isEmpty()) {
+			handlerBuilder.reflectionsStrategyId(c.reflectionsStrategyId());
+		}
+
+		return AgentCoreLongTermMemoryAdvisor.builder(retriever)
+			.memoryStrategy(AgentCoreLongTermMemoryStrategyType.EPISODIC)
+			.handler(handlerBuilder.build())
 			.build();
 	}
 
 	// ==================== Helper Methods ====================
 
-	private Map<String, String> buildStrategyConfigs(AgentCoreLongTermMemoryProperties config) {
-		Map<String, String> configs = new HashMap<>();
+	/**
+	 * Collects the expected namespace patterns for each explicitly configured strategy,
+	 * keyed by strategy id. Multiple namespaces per strategy are possible — e.g. episodic
+	 * strategies with reflections live under the same id but two namespaces. Used by the
+	 * startup namespace validator/registrar.
+	 */
+	private Map<String, List<String>> collectNamespacesByStrategy(AgentCoreLongTermMemoryProperties config) {
+		Map<String, List<String>> namespacesByStrategy = new HashMap<>();
 		if (config.semantic() != null && config.semantic().strategyId() != null) {
-			configs.put(config.semantic().strategyId(), config.semantic().resolveNamespacePattern());
+			namespacesByStrategy.put(config.semantic().strategyId(),
+					List.of(config.semantic().resolveNamespacePattern()));
 		}
 		if (config.userPreference() != null && config.userPreference().strategyId() != null) {
-			configs.put(config.userPreference().strategyId(), config.userPreference().resolveNamespacePattern());
+			namespacesByStrategy.put(config.userPreference().strategyId(),
+					List.of(config.userPreference().resolveNamespacePattern()));
 		}
 		if (config.summary() != null && config.summary().strategyId() != null) {
-			configs.put(config.summary().strategyId(), config.summary().resolveNamespacePattern());
+			namespacesByStrategy.put(config.summary().strategyId(),
+					List.of(config.summary().resolveNamespacePattern()));
 		}
 		if (config.episodic() != null && config.episodic().strategyId() != null) {
-			configs.put(config.episodic().strategyId(), config.episodic().resolveNamespacePattern());
-			if (config.episodic().hasReflections()) {
-				configs.put(config.episodic().reflectionsStrategyId(), config.episodic().resolveNamespacePattern());
+			var episodic = config.episodic();
+			List<String> namespaces = new ArrayList<>();
+			namespaces.add(episodic.resolveNamespacePattern());
+
+			// Modern path: reflections live under the same strategy, different namespace.
+			String reflectionsPattern = episodic.resolveReflectionsNamespacePattern();
+			if (reflectionsPattern != null) {
+				namespaces.add(reflectionsPattern);
+			}
+			namespacesByStrategy.put(episodic.strategyId(), namespaces);
+
+			// Legacy path: reflections in a separate strategy, same namespace. Kept
+			// working for one release to ease migration. Will be removed.
+			if (reflectionsPattern == null && episodic.reflectionsStrategyId() != null
+					&& !episodic.reflectionsStrategyId().isEmpty()) {
+				namespacesByStrategy.put(episodic.reflectionsStrategyId(), List.of(episodic.resolveNamespacePattern()));
 			}
 		}
-		return configs;
+		return namespacesByStrategy;
 	}
 
 }
