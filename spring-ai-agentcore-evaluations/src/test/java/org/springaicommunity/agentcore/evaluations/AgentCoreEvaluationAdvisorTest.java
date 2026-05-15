@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -30,6 +32,9 @@ import reactor.core.publisher.Sinks;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -72,57 +77,10 @@ class AgentCoreEvaluationAdvisorTest {
 	}
 
 	@Test
-	void shouldBuildWithCustomEvaluators() {
-		List<String> evaluators = List.of("Builtin.Helpfulness", "Builtin.Correctness");
-
-		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client)
-			.evaluatorIds(evaluators)
-			.build();
-
-		assertThat(advisor).isNotNull();
-	}
-
-	@Test
 	void shouldBuildWithCustomOrder() {
 		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client).order(500).build();
 
 		assertThat(advisor.getOrder()).isEqualTo(500);
-	}
-
-	@Test
-	void shouldBuildWithCallback() {
-		AtomicReference<EvaluationEvent> capturedEvent = new AtomicReference<>();
-
-		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client)
-			.callback(capturedEvent::set)
-			.build();
-
-		assertThat(advisor).isNotNull();
-	}
-
-	@Test
-	void shouldBuildWithSampleRate() {
-		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client).sampleRate(0.5).build();
-
-		assertThat(advisor).isNotNull();
-	}
-
-	@Test
-	void shouldClampSampleRateToValidRange() {
-		// Sample rate > 1.0 should be clamped to 1.0
-		AgentCoreEvaluationAdvisor advisor1 = AgentCoreEvaluationAdvisor.builder(client).sampleRate(1.5).build();
-		assertThat(advisor1).isNotNull();
-
-		// Sample rate < 0.0 should be clamped to 0.0
-		AgentCoreEvaluationAdvisor advisor2 = AgentCoreEvaluationAdvisor.builder(client).sampleRate(-0.5).build();
-		assertThat(advisor2).isNotNull();
-	}
-
-	@Test
-	void shouldBuildWithAsyncDisabled() {
-		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client).async(false).build();
-
-		assertThat(advisor).isNotNull();
 	}
 
 	@Test
@@ -133,7 +91,7 @@ class AgentCoreEvaluationAdvisorTest {
 
 		EvaluationResult result = new EvaluationResult("Builtin.Helpfulness", 0.83, "Very Helpful", "ok", 100, 20,
 				null);
-		when(client.evaluateAll(anyList(), anyList())).thenReturn(List.of(result));
+		when(client.evaluateAll(anyList(), anyList(), any())).thenReturn(List.of(result));
 
 		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client)
 			.async(false)
@@ -148,9 +106,7 @@ class AgentCoreEvaluationAdvisorTest {
 
 		advisor.adviseCall(request, chain);
 
-		@SuppressWarnings("unchecked")
-		List<EvaluationResult> stored = (List<EvaluationResult>) response.context()
-			.get(AgentCoreEvaluationAdvisor.EVALUATION_RESULTS_KEY);
+		List<EvaluationResult> stored = AgentCoreEvaluationAdvisor.resultsFrom(response);
 		assertThat(stored).containsExactly(result);
 		assertThat(captured.get()).isNotNull();
 		assertThat(captured.get().results()).containsExactly(result);
@@ -169,7 +125,7 @@ class AgentCoreEvaluationAdvisorTest {
 
 		EvaluationResult errored = new EvaluationResult("Builtin.Helpfulness", null, null, null, null, null,
 				"AgentSpanMappingException");
-		when(client.evaluateAll(anyList(), anyList())).thenReturn(List.of(errored));
+		when(client.evaluateAll(anyList(), anyList(), any())).thenReturn(List.of(errored));
 
 		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client)
 			.async(false)
@@ -191,7 +147,7 @@ class AgentCoreEvaluationAdvisorTest {
 	@Test
 	void shouldAggregateStreamingChunksForEvaluation() {
 		AtomicReference<List<?>> capturedSpans = new AtomicReference<>();
-		when(client.evaluateAll(anyList(), anyList())).thenAnswer(inv -> {
+		when(client.evaluateAll(anyList(), anyList(), any())).thenAnswer(inv -> {
 			capturedSpans.set(inv.getArgument(1));
 			return List.of();
 		});
@@ -209,7 +165,7 @@ class AgentCoreEvaluationAdvisorTest {
 
 	@Test
 	void streamingShouldEmitChunksBeforeSourceCompletes() {
-		when(client.evaluateAll(anyList(), anyList())).thenReturn(List.of());
+		when(client.evaluateAll(anyList(), anyList(), any())).thenReturn(List.of());
 
 		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client).async(false).build();
 
@@ -225,11 +181,11 @@ class AgentCoreEvaluationAdvisorTest {
 		// Source has NOT completed yet; downstream must already have both chunks.
 		assertThat(received).hasSize(2);
 		// Evaluation must not have fired yet.
-		verify(client, never()).evaluateAll(anyList(), anyList());
+		verify(client, never()).evaluateAll(anyList(), anyList(), any());
 
 		source.tryEmitComplete();
 		sub.dispose();
-		verify(client, times(1)).evaluateAll(anyList(), anyList());
+		verify(client, times(1)).evaluateAll(anyList(), anyList(), any());
 	}
 
 	@Test
@@ -244,7 +200,7 @@ class AgentCoreEvaluationAdvisorTest {
 
 		advisor.adviseStream(request("hi"), chain).collectList().block();
 
-		verify(client, never()).evaluateAll(anyList(), anyList());
+		verify(client, never()).evaluateAll(anyList(), anyList(), any());
 	}
 
 	@Test
@@ -259,7 +215,7 @@ class AgentCoreEvaluationAdvisorTest {
 		source.tryEmitNext(response("partial"));
 		sub.dispose();
 
-		verify(client, never()).evaluateAll(anyList(), anyList());
+		verify(client, never()).evaluateAll(anyList(), anyList(), any());
 	}
 
 	@Test
@@ -268,7 +224,7 @@ class AgentCoreEvaluationAdvisorTest {
 		AgentCoreEvaluationMetrics metrics = new AgentCoreEvaluationMetrics(registry);
 		EvaluationResult result = new EvaluationResult("Builtin.Helpfulness", 0.83, "Very Helpful", "ok", 100, 20,
 				null);
-		when(client.evaluateAll(anyList(), anyList())).thenReturn(List.of(result));
+		when(client.evaluateAll(anyList(), anyList(), any())).thenReturn(List.of(result));
 
 		AgentCoreEvaluationAdvisor advisor = AgentCoreEvaluationAdvisor.builder(client)
 			.async(true)
@@ -289,6 +245,39 @@ class AgentCoreEvaluationAdvisorTest {
 			assertThat(counter).isNotNull();
 			assertThat(counter.count()).isEqualTo(1.0);
 		});
+	}
+
+	private static final EvaluationResult VALID_RESULT = new EvaluationResult("Builtin.Helpfulness", 0.9, "Good", null,
+			null, null, null);
+
+	/**
+	 * Cases for {@link #resultsFromIsTypeSafe(String, Consumer, List)}.
+	 * <p>
+	 * Each case names the scenario, supplies a {@link Consumer} that prepares the
+	 * response context, and declares the results the accessor must return. Bundling setup
+	 * and expectation per row keeps the parameterized contract visible at a glance and
+	 * scales to new edge cases by adding a row rather than another method.
+	 */
+	static Stream<Arguments> resultsFromCases() {
+		return Stream.of(Arguments.of("context key absent", (Consumer<ChatClientResponse>) response -> {
+		}, List.of()),
+				Arguments.of("value is not a list",
+						(Consumer<ChatClientResponse>) response -> response.context()
+							.put(AgentCoreEvaluationAdvisor.EVALUATION_RESULTS_KEY, "not-a-list"),
+						List.of()),
+				Arguments.of("list contains mixed entry types",
+						(Consumer<ChatClientResponse>) response -> response.context()
+							.put(AgentCoreEvaluationAdvisor.EVALUATION_RESULTS_KEY, List.of(VALID_RESULT, "stray", 42)),
+						List.of(VALID_RESULT)));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("resultsFromCases")
+	void resultsFromIsTypeSafe(String name, Consumer<ChatClientResponse> setup, List<EvaluationResult> expected) {
+		ChatClientResponse response = response("hi");
+		setup.accept(response);
+
+		assertThat(AgentCoreEvaluationAdvisor.resultsFrom(response)).containsExactlyElementsOf(expected);
 	}
 
 	private static ChatClientRequest request(String userText) {

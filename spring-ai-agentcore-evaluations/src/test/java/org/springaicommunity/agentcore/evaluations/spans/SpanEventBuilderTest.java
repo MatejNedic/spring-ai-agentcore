@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.evaluations;
+package org.springaicommunity.agentcore.evaluations.spans;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,72 +84,52 @@ class SpanEventBuilderTest {
 		assertThat(bodyStr).contains("Paris.");
 	}
 
-	@Test
-	void defaultFinishReasonIsEndTurnWhenNotSet() {
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("finishReasonCases")
+	void finishReasonRendersExpectedValue(String name, String input, String expected) {
 		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
 			.completionEvent("Paris.")
+			.finishReason(input)
 			.buildSessionSpans()
 			.get(1);
 
-		assertThat(event.get("body").toString()).contains("finish_reason=end_turn");
+		assertThat(event.get("body").toString()).contains("finish_reason=" + expected);
 	}
 
-	@Test
-	void explicitFinishReasonIsPropagatedToBody() {
-		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.completionEvent("Partial response...")
-			.finishReason("tool_use")
-			.buildSessionSpans()
-			.get(1);
-
-		String bodyStr = event.get("body").toString();
-		assertThat(bodyStr).contains("finish_reason=tool_use");
-		assertThat(bodyStr).doesNotContain("finish_reason=end_turn");
+	static Stream<Arguments> finishReasonCases() {
+		return Stream.of(Arguments.of("null falls back to end_turn", null, "end_turn"),
+				Arguments.of("blank falls back to end_turn", "   ", "end_turn"),
+				Arguments.of("explicit value is propagated", "tool_use", "tool_use"));
 	}
 
-	@Test
-	void blankFinishReasonIsIgnored() {
-		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.completionEvent("Paris.")
-			.finishReason("   ")
-			.buildSessionSpans()
-			.get(1);
-
-		// Falls back to default
-		assertThat(event.get("body").toString()).contains("finish_reason=end_turn");
-	}
-
-	@Test
-	void tokenUsageAttributesAreEmittedWhenBothPresent() {
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("tokenUsageCases")
+	void tokenUsageAttributesReflectNullability(String name, Integer input, Integer output, boolean inputEmitted,
+			boolean outputEmitted) {
 		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.tokenUsage(120, 45)
+			.tokenUsage(input, output)
 			.buildSessionSpans()
 			.getFirst();
 
-		assertThat(attributes(span)).containsEntry("gen_ai.usage.input_tokens", 120)
-			.containsEntry("gen_ai.usage.output_tokens", 45);
+		Map<String, Object> attrs = attributes(span);
+		if (inputEmitted) {
+			assertThat(attrs).containsEntry("gen_ai.usage.input_tokens", input);
+		}
+		else {
+			assertThat(attrs).doesNotContainKey("gen_ai.usage.input_tokens");
+		}
+		if (outputEmitted) {
+			assertThat(attrs).containsEntry("gen_ai.usage.output_tokens", output);
+		}
+		else {
+			assertThat(attrs).doesNotContainKey("gen_ai.usage.output_tokens");
+		}
 	}
 
-	@Test
-	void tokenUsageAttributesAreOmittedWhenNull() {
-		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.tokenUsage(null, null)
-			.buildSessionSpans()
-			.getFirst();
-
-		assertThat(attributes(span)).doesNotContainKey("gen_ai.usage.input_tokens")
-			.doesNotContainKey("gen_ai.usage.output_tokens");
-	}
-
-	@Test
-	void tokenUsagePartiallyPresentEmitsOnlyAvailableAttributes() {
-		Map<String, Object> span = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.tokenUsage(120, null)
-			.buildSessionSpans()
-			.getFirst();
-
-		assertThat(attributes(span)).containsEntry("gen_ai.usage.input_tokens", 120)
-			.doesNotContainKey("gen_ai.usage.output_tokens");
+	static Stream<Arguments> tokenUsageCases() {
+		return Stream.of(Arguments.of("both present are emitted", 120, 45, true, true),
+				Arguments.of("both null are omitted", null, null, false, false),
+				Arguments.of("only input present emits only input", 120, null, true, false));
 	}
 
 	@Test
@@ -171,30 +155,22 @@ class SpanEventBuilderTest {
 		assertThat(bodyStr).contains("Current answer");
 	}
 
-	@Test
-	void emptyHistoryPreservesSingleMessageWireShape() {
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("emptyHistoryCases")
+	void absentHistoryProducesSingleMessageBody(String name, List<Map<String, Object>> history) {
 		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
 			.promptEvent("Current question")
 			.completionEvent("Current answer")
-			.history(List.of())
+			.history(history)
 			.buildSessionSpans()
 			.get(1);
 
 		String bodyStr = event.get("body").toString();
-		// Exact match of the baseline — one user entry in input.messages
 		assertThat(bodyStr).contains("Current question").contains("Current answer");
 	}
 
-	@Test
-	void nullHistoryTreatedAsEmpty() {
-		Map<String, Object> event = SpanEventBuilder.agentInvocation(TRACE_ID, SESSION_ID)
-			.promptEvent("Q")
-			.completionEvent("A")
-			.history(null)
-			.buildSessionSpans()
-			.get(1);
-
-		assertThat(event.get("body").toString()).contains("Q").contains("A");
+	static Stream<Arguments> emptyHistoryCases() {
+		return Stream.of(Arguments.of("empty list", List.of()), Arguments.of("null list", null));
 	}
 
 	@SuppressWarnings("unchecked")

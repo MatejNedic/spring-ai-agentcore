@@ -32,6 +32,7 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springaicommunity.agentcore.evaluations.spans.SpanEventBuilder;
 import reactor.core.publisher.Flux;
 
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -69,8 +70,34 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 	 * the evaluation completes, so the key may not be populated by the time the caller
 	 * reads {@code response.context()}. Prefer the callback or metrics channels in async
 	 * mode.
+	 * <p>
+	 * Prefer {@link #resultsFrom(ChatClientResponse)} over reading this key directly: the
+	 * accessor performs the type check that callers would otherwise have to express as an
+	 * unchecked cast.
 	 */
 	public static final String EVALUATION_RESULTS_KEY = "agentcore.evaluation.results";
+
+	/**
+	 * Extract the evaluation results stored on a chat response by this advisor.
+	 * <p>
+	 * Returns an empty list when the key is absent or the value is not a list of
+	 * {@link EvaluationResult}. This is the type-safe replacement for an unchecked cast
+	 * on {@link ChatClientResponse#context()}: any non-{@code EvaluationResult} entries
+	 * are filtered out rather than triggering a {@code ClassCastException} at use site.
+	 * <p>
+	 * Reliable only when the advisor is configured with {@code async=false}; in async
+	 * mode the handler may return before evaluation completes and this method may return
+	 * an empty list even though evaluation will eventually populate the context.
+	 * @param response the chat response to read from
+	 * @return immutable list of evaluation results, never {@code null}
+	 */
+	public static List<EvaluationResult> resultsFrom(ChatClientResponse response) {
+		Object value = response.context().get(EVALUATION_RESULTS_KEY);
+		if (value instanceof List<?> list) {
+			return list.stream().filter(EvaluationResult.class::isInstance).map(EvaluationResult.class::cast).toList();
+		}
+		return List.of();
+	}
 
 	private final AgentCoreEvaluationClient client;
 
@@ -263,7 +290,10 @@ public class AgentCoreEvaluationAdvisor implements CallAdvisor, StreamAdvisor {
 			List<Map<String, Object>> spans = spanBuilder.buildSessionSpans();
 
 			Instant start = Instant.now();
-			List<EvaluationResult> results = this.client.evaluateAll(this.evaluatorIds, spans);
+			// Run all configured evaluators in parallel on the advisor's executor.
+			// Latency drops from sum(per-evaluator) to max(per-evaluator) on the
+			// synchronous path and reduces wall-clock work on the async path too.
+			List<EvaluationResult> results = this.client.evaluateAll(this.evaluatorIds, spans, this.executor);
 			Duration latency = Duration.between(start, Instant.now());
 
 			// Record metrics

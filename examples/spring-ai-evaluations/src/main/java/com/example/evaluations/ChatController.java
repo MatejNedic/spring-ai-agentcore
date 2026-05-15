@@ -55,9 +55,7 @@ public class ChatController {
 
 		ChatClientResponse response = chatClient.prompt().user(request.message()).call().chatClientResponse();
 
-		@SuppressWarnings("unchecked")
-		List<EvaluationResult> evaluations = (List<EvaluationResult>) response.context()
-			.getOrDefault(AgentCoreEvaluationAdvisor.EVALUATION_RESULTS_KEY, List.of());
+		List<EvaluationResult> evaluations = AgentCoreEvaluationAdvisor.resultsFrom(response);
 
 		String content = response.chatResponse() != null && response.chatResponse().getResult() != null
 				? response.chatResponse().getResult().getOutput().getText() : "";

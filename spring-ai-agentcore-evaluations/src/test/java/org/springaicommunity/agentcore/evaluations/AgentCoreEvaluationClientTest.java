@@ -13,6 +13,11 @@ package org.springaicommunity.agentcore.evaluations;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -82,6 +87,83 @@ class AgentCoreEvaluationClientTest {
 		assertThat(r.isError()).isTrue();
 		assertThat(r.errorCode()).isEqualTo("AgentSpanMappingException");
 		assertThat(r.errorMessage()).isEqualTo("bad span");
+	}
+
+	@Test
+	void evaluateAllIsolatesPerEvaluatorExceptions() {
+		BedrockAgentCoreClient sdk = mock(BedrockAgentCoreClient.class);
+		when(sdk.evaluate(any(EvaluateRequest.class))).thenAnswer(inv -> {
+			String id = inv.getArgument(0, EvaluateRequest.class).evaluatorId();
+			if ("Builtin.Correctness".equals(id)) {
+				throw new IllegalStateException("boom");
+			}
+			return EvaluateResponse.builder()
+				.evaluationResults(EvaluationResultContent.builder().evaluatorId(id).value(0.9).build())
+				.build();
+		});
+
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			List<EvaluationResult> results = new AgentCoreEvaluationClient(sdk).evaluateAll(
+					List.of("Builtin.Helpfulness", "Builtin.Correctness"), List.of(Map.of("k", "v")), executor);
+
+			assertThat(results).hasSize(2);
+			assertThat(results.get(0).evaluatorId()).isEqualTo("Builtin.Helpfulness");
+			assertThat(results.get(0).isError()).isFalse();
+			assertThat(results.get(1).evaluatorId()).isEqualTo("Builtin.Correctness");
+			assertThat(results.get(1).isError()).isTrue();
+			assertThat(results.get(1).errorCode()).isEqualTo("ClientException:IllegalStateException");
+		}
+		finally {
+			executor.shutdown();
+		}
+	}
+
+	@Test
+	void evaluateAllRunsEvaluatorsConcurrentlyAndPreservesOrder() {
+		// Three evaluators each block until the latch counts to zero. With a serial
+		// implementation this would deadlock (the latch never reaches zero from a
+		// single worker). Concurrent execution releases all three at once. The same
+		// run also asserts that results come back in evaluatorIds order — ordering is
+		// a property of every successful parallel call, not a separate scenario, so
+		// folding it in here keeps one test instead of two with the same setup.
+		int evaluatorCount = 3;
+		CountDownLatch latch = new CountDownLatch(evaluatorCount);
+		AtomicInteger maxConcurrent = new AtomicInteger();
+		AtomicInteger inFlight = new AtomicInteger();
+
+		BedrockAgentCoreClient sdk = mock(BedrockAgentCoreClient.class);
+		when(sdk.evaluate(any(EvaluateRequest.class))).thenAnswer(inv -> {
+			int n = inFlight.incrementAndGet();
+			maxConcurrent.accumulateAndGet(n, Math::max);
+			latch.countDown();
+			boolean ok = latch.await(5, TimeUnit.SECONDS);
+			inFlight.decrementAndGet();
+			if (!ok) {
+				throw new IllegalStateException("Latch never released — evaluators ran serially");
+			}
+			return EvaluateResponse.builder()
+				.evaluationResults(EvaluationResultContent.builder()
+					.evaluatorId(inv.getArgument(0, EvaluateRequest.class).evaluatorId())
+					.value(1.0)
+					.build())
+				.build();
+		});
+
+		ExecutorService executor = Executors.newFixedThreadPool(evaluatorCount);
+		try {
+			List<EvaluationResult> results = new AgentCoreEvaluationClient(sdk).evaluateAll(
+					List.of("Builtin.Helpfulness", "Builtin.Correctness", "Builtin.Coherence"),
+					List.of(Map.of("k", "v")), executor);
+
+			assertThat(maxConcurrent.get()).isEqualTo(evaluatorCount);
+			assertThat(results).extracting(EvaluationResult::evaluatorId)
+				.containsExactly("Builtin.Helpfulness", "Builtin.Correctness", "Builtin.Coherence");
+			assertThat(results).allMatch(r -> !r.isError());
+		}
+		finally {
+			executor.shutdown();
+		}
 	}
 
 }

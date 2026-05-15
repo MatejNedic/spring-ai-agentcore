@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,24 +81,68 @@ public class AgentCoreEvaluationClient {
 	}
 
 	/**
-	 * Evaluate session spans using multiple evaluators.
+	 * Evaluate session spans using multiple evaluators concurrently.
+	 * <p>
+	 * Each evaluator runs as an independent task on the supplied {@code executor}.
+	 * Per-evaluator exceptions are captured into result objects, so the returned list
+	 * always contains one or more entries per evaluator regardless of failures.
+	 * End-to-end latency is bounded by the slowest evaluator rather than the sum of all
+	 * evaluator latencies.
+	 * <p>
+	 * <strong>Throughput trade-off:</strong> N evaluators issue N concurrent calls to the
+	 * AgentCore service. With aggressive sample rates this can surface throttling sooner
+	 * than running them one at a time. AWS SDK retry policies handle the retries, but
+	 * callers running at high QPS should size {@code executor} accordingly.
+	 * <p>
+	 * Result ordering follows {@code evaluatorIds}: the entries from
+	 * {@code evaluatorIds.get(0)} appear first, then those from
+	 * {@code evaluatorIds.get(1)}, and so on. Concurrent execution does not interleave
+	 * results.
 	 * @param evaluatorIds list of evaluator IDs to run
 	 * @param sessionSpans the spans in OTel-compatible format
-	 * @return list of evaluation results from all evaluators
+	 * @param executor executor used to run evaluator calls; typically the virtual-thread
+	 * executor wired by the auto-configuration
+	 * @return list of evaluation results from all evaluators, in {@code evaluatorIds}
+	 * order
 	 */
-	public List<EvaluationResult> evaluateAll(List<String> evaluatorIds, List<Map<String, Object>> sessionSpans) {
-		List<EvaluationResult> allResults = new ArrayList<>();
+	public List<EvaluationResult> evaluateAll(List<String> evaluatorIds, List<Map<String, Object>> sessionSpans,
+			Executor executor) {
+		if (evaluatorIds.isEmpty()) {
+			return List.of();
+		}
+		List<CompletableFuture<List<EvaluationResult>>> futures = new ArrayList<>(evaluatorIds.size());
 		for (String evaluatorId : evaluatorIds) {
-			try {
-				allResults.addAll(evaluate(evaluatorId, sessionSpans));
-			}
-			catch (Exception e) {
-				logger.error("Evaluation failed for evaluator {}: {}", evaluatorId, e.getMessage());
-				allResults.add(new EvaluationResult(evaluatorId, null, null, null, null, null,
-						"ClientException:" + e.getClass().getSimpleName(), e.getMessage()));
-			}
+			futures.add(
+					CompletableFuture.supplyAsync(() -> evaluateWithErrorCapture(evaluatorId, sessionSpans), executor));
+		}
+		List<EvaluationResult> allResults = new ArrayList<>();
+		for (CompletableFuture<List<EvaluationResult>> future : futures) {
+			// .join() preserves evaluator order (we wait on futures in submission order).
+			// Per-task exceptions are already captured inside evaluateWithErrorCapture,
+			// so
+			// .join() should not throw unless the executor itself rejects/cancels the
+			// task.
+			allResults.addAll(future.join());
 		}
 		return allResults;
+	}
+
+	/**
+	 * Run a single evaluator and convert any thrown exception into an error result. The
+	 * resulting {@link EvaluationResult} carries an
+	 * {@code errorCode}/{@code errorMessage} instead of a score so {@link #evaluateAll}
+	 * never aborts because of a single evaluator failure.
+	 */
+	private List<EvaluationResult> evaluateWithErrorCapture(String evaluatorId,
+			List<Map<String, Object>> sessionSpans) {
+		try {
+			return evaluate(evaluatorId, sessionSpans);
+		}
+		catch (Exception e) {
+			logger.error("Evaluation failed for evaluator {}: {}", evaluatorId, e.getMessage());
+			return List.of(new EvaluationResult(evaluatorId, null, null, null, null, null,
+					"ClientException:" + e.getClass().getSimpleName(), e.getMessage()));
+		}
 	}
 
 	private static List<Document> convertToDocuments(List<Map<String, Object>> spans) {
