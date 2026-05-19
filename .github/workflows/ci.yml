@@ -15,6 +15,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+          cache: 'maven'
+      - name: Verify code formatting (Spring Java Format)
+        run: mvn -ntp io.spring.javaformat:spring-javaformat-maven-plugin:validate
       - name: Build with Maven
         run: mvn -ntp clean verify
 
