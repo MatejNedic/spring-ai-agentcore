@@ -1,86 +1,101 @@
 package org.springaicommunity.example;
 
+import java.util.Comparator;
+import java.util.List;
+
+import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryAdvisor;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreMemory;
-import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryProperties;
-import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryRetriever;
 import org.springaicommunity.agentcore.memory.shorttem.AgentCoreShortTermMemoryRepository;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class ChatController {
 
-	private final ChatClient shortTermChatClient;
-	private final ChatClient longTermChatClient;
-	private final ChatMemory chatMemory;
-	private final AgentCoreMemory agentCoreMemory;
-	private final AgentCoreLongTermMemoryRetriever retriever;
-	private final AgentCoreLongTermMemoryProperties config;
-
 	private static final String CONVERSATION_ID = "testActor:testSession";
 
-	public ChatController(
-			ChatClient.Builder chatClientBuilder,
-			AgentCoreMemory agentCoreMemory, ChatMemory chatMemory,
-			AgentCoreLongTermMemoryRetriever retriever, AgentCoreLongTermMemoryProperties config,
+	private final ChatClient shortTermChatClient;
+
+	private final ChatClient longTermChatClient;
+
+	private final ChatMemory chatMemory;
+
+	private final AgentCoreMemory agentCoreMemory;
+
+	public ChatController(ChatClient.Builder chatClientBuilder, AgentCoreMemory agentCoreMemory, ChatMemory chatMemory,
 			AgentCoreShortTermMemoryRepository memoryRepository) {
 		this.agentCoreMemory = agentCoreMemory;
-        this.chatMemory = chatMemory;
-		this.retriever = retriever;
-		this.config = config;
-
-        this.shortTermChatClient = chatClientBuilder.build();
+		this.chatMemory = chatMemory;
+		this.shortTermChatClient = chatClientBuilder.build();
 		this.longTermChatClient = chatClientBuilder.build();
 
-		// NOTE! The short-term memory events are removed on startup to run example on clean initial state
+		// NOTE: the short-term memory events are cleared on startup so the example
+		// always runs from a clean initial state.
 		memoryRepository.deleteByConversationId(CONVERSATION_ID);
-    }
+	}
 
 	@PostMapping("/api/short")
 	public ChatResponse shortChat(@RequestBody ChatRequest request) {
-		String response = shortTermChatClient.prompt()
-				.user(request.message())
-				.advisors(agentCoreMemory.shortTermMemoryAdvisor)
-				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, CONVERSATION_ID))
-				.call()
-				.content();
+		String response = this.shortTermChatClient.prompt()
+			.user(request.message())
+			.advisors(this.agentCoreMemory.shortTermMemoryAdvisor)
+			.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, CONVERSATION_ID))
+			.call()
+			.content();
 
 		return new ChatResponse(response);
 	}
 
 	@PostMapping("/api/long")
 	public ChatResponse longChat(@RequestBody ChatRequest request) {
-		String response = longTermChatClient.prompt()
-				.user(request.message())
-				.advisors(agentCoreMemory.advisors)
-				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, CONVERSATION_ID))
-				.call()
-				.content();
+		String response = this.longTermChatClient.prompt()
+			.user(request.message())
+			.advisors(this.agentCoreMemory.advisors)
+			.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, CONVERSATION_ID))
+			.call()
+			.content();
 
 		return new ChatResponse(response);
 	}
 
 	@GetMapping("/api/history")
 	public List<Message> getHistory() {
-		return chatMemory.get(CONVERSATION_ID);
+		return this.chatMemory.get(CONVERSATION_ID);
 	}
 
 	@DeleteMapping("/api/history")
 	public void clearHistory() {
-		chatMemory.clear(CONVERSATION_ID);
+		this.chatMemory.clear(CONVERSATION_ID);
 	}
 
-	@GetMapping("/api/memories")
-	public List<AgentCoreLongTermMemoryRetriever.MemoryRecord> getMemories() {
-		return retriever.listMemories(config.summary().strategyId(), "testActor",
-				config.summary().resolveNamespacePattern());
+	/**
+	 * Lists the long-term memory advisors wired up by the module, in retrieval order.
+	 * Useful to verify that auto-discovery (or explicit config) picked up the strategies
+	 * you expect. Does not fetch records — the LTM advisors themselves fetch per request
+	 * and log a line like {@code "Enriched prompt with N records for strategy X"} at
+	 * INFO when they find data.
+	 */
+	@GetMapping("/api/ltm/strategies")
+	public List<StrategyInfo> getLtmStrategies() {
+		return this.agentCoreMemory.longTermMemoryAdvisors.stream()
+			.sorted(Comparator.comparingInt(AgentCoreLongTermMemoryAdvisor::getOrder))
+			.map(a -> new StrategyInfo(a.getName(), a.getOrder()))
+			.toList();
 	}
 
-	public record ChatRequest(String message) {}
-	public record ChatResponse(String response) {}
+	public record ChatRequest(String message) {
+	}
+
+	public record ChatResponse(String response) {
+	}
+
+	public record StrategyInfo(String name, int order) {
+	}
 
 }

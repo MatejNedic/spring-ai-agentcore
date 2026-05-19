@@ -12,6 +12,7 @@
     <url>https://github.com/spring-ai-community/spring-ai-agentcore</url>
     <modules>
         <module>spring-ai-agentcore-bom</module>
+        <module>spring-ai-agentcore-common</module>
         <module>spring-ai-agentcore-artifact-store</module>
         <module>spring-ai-agentcore-runtime-starter</module>
         <module>spring-ai-agentcore-memory</module>
