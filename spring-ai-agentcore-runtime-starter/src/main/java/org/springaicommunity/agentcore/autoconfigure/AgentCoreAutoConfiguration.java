@@ -16,8 +16,6 @@
 
 package org.springaicommunity.agentcore.autoconfigure;
 
-import java.util.List;
-
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 import org.springaicommunity.agentcore.controller.AgentCorePingController;
 import org.springaicommunity.agentcore.controller.AgentCorePingHandler;
@@ -28,21 +26,18 @@ import org.springaicommunity.agentcore.service.AgentCoreInvocationBodyArgumentRe
 import org.springaicommunity.agentcore.service.AgentCoreInvocationRegistrar;
 import org.springaicommunity.agentcore.service.AgentCoreMethodScanner;
 import org.springaicommunity.agentcore.throttle.ThrottleConfiguration;
-
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.validation.Validator;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
 
 /**
  * Auto-configuration for AgentCore runtime support.
@@ -63,48 +58,48 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * </ul>
  */
 @Configuration
-@ConditionalOnClass({ AgentCoreInvocation.class, RestController.class })
-@Import({ AgentCorePingAutoConfiguration.class, AgentCoreActuatorAutoConfiguration.class, ThrottleConfiguration.class })
+@ConditionalOnClass({AgentCoreInvocation.class, RestController.class})
+@Import({AgentCorePingAutoConfiguration.class, AgentCoreActuatorAutoConfiguration.class, ThrottleConfiguration.class})
 public class AgentCoreAutoConfiguration {
 
-	@Bean
-	@ConditionalOnMissingBean
-	public static AgentCoreMethodScanner agentCoreMethodScanner() {
-		return new AgentCoreMethodScanner();
-	}
+    @Bean
+    @ConditionalOnMissingBean
+    public static AgentCoreMethodScanner agentCoreMethodScanner() {
+        return new AgentCoreMethodScanner();
+    }
 
-	@Bean
-	@ConditionalOnMissingBean
-	public AgentCoreInvocationRegistrar agentCoreInvocationRegistrar(AgentCoreMethodScanner scanner,
-			org.springframework.context.ApplicationContext applicationContext,
-			ObjectProvider<Validator> validatorProvider) {
-		return new AgentCoreInvocationRegistrar(scanner, applicationContext, validatorProvider);
-	}
+    @Bean
+    @ConditionalOnMissingBean
+    public AgentCoreInvocationRegistrar agentCoreInvocationRegistrar(AgentCoreMethodScanner scanner,
+                                                                     org.springframework.context.ApplicationContext applicationContext,
+                                                                     ObjectProvider<Validator> validatorProvider) {
+        return new AgentCoreInvocationRegistrar(scanner, applicationContext, validatorProvider);
+    }
 
-	@Bean
-	public WebMvcConfigurer agentCoreWebMvcConfigurer(AgentCoreMethodScanner scanner,
-			ObjectProvider<Validator> validator) {
-		return new WebMvcConfigurer() {
-			@Override
-			public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
-				resolvers.add(new AgentCoreContextArgumentResolver());
-				resolvers.add(new AgentCoreInvocationBodyArgumentResolver(scanner,
-						AgentCoreInvocationBodyArgumentResolver.DEFAULT_MESSAGE_CONVERTERS,
-						validator.getIfAvailable()));
-			}
-		};
-	}
+    @Bean
+    public WebMvcConfigurer agentCoreWebMvcConfigurer(AgentCoreMethodScanner scanner,
+                                                      ObjectProvider<Validator> validator) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+                resolvers.add(new AgentCoreContextArgumentResolver());
+                resolvers.add(new AgentCoreInvocationBodyArgumentResolver(scanner,
+                        AgentCoreInvocationBodyArgumentResolver.DEFAULT_MESSAGE_CONVERTERS,
+                        validator.getIfAvailable()));
+            }
+        };
+    }
 
-	@Bean
-	@ConditionalOnMissingBean
-	public AgentCoreTaskTracker agentCoreTaskTracker() {
-		return new AgentCoreTaskTracker();
-	}
+    @Bean
+    @ConditionalOnMissingBean
+    public AgentCoreTaskTracker agentCoreTaskTracker() {
+        return new AgentCoreTaskTracker();
+    }
 
-	@Bean
-	@ConditionalOnMissingBean(AgentCorePingHandler.class)
-	public AgentCorePingController agentCoreHealthController(AgentCorePingService agentCorePingService) {
-		return new AgentCorePingController(agentCorePingService);
-	}
+    @Bean
+    @ConditionalOnMissingBean(AgentCorePingHandler.class)
+    public AgentCorePingController agentCoreHealthController(AgentCorePingService agentCorePingService) {
+        return new AgentCorePingController(agentCorePingService);
+    }
 
 }
