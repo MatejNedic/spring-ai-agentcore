@@ -23,7 +23,7 @@ public class ExtendedChatController {
 	private final ChatMemory chatMemory;
 	private final JwtUtil jwtUtil;
 
-	public ExtendedChatController(ChatClient.Builder chatClientBuilder, 
+	public ExtendedChatController(ChatClient.Builder chatClientBuilder,
 								  ChatMemoryRepository memoryRepository,
 								  JwtUtil jwtUtil) {
 		this.jwtUtil = jwtUtil;
@@ -31,7 +31,7 @@ public class ExtendedChatController {
 				.chatMemoryRepository(memoryRepository)
 				.maxMessages(10)
 				.build();
-		
+
 		this.chatClient = chatClientBuilder
 				.defaultTools(new DateTimeTools())
 				.defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
@@ -39,20 +39,20 @@ public class ExtendedChatController {
 	}
 
 	@AgentCoreInvocation
-	public Map<String, Object> handleChat(Map<String, Object> request, AgentCoreContext context) {
+	public Map<String, Object> handleChat(MessagePrompt request, AgentCoreContext context) {
 		try {
 			// Extract user identity from JWT token in Authorization header
 			String userId = extractUserIdFromContext(context);
 			String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-			
+
 			// Create conversation ID from user and session
 			String conversationId = userId + ":" + sessionId;
-			
-			String message = (String) request.get("prompt");
+
+			String message = request.prompt();
 			if (message == null) {
-				message = (String) request.get("message");
+				message = request.message();
 			}
-			
+
 			if (message == null) {
 				return Map.of(
 					"error", "No message provided",
@@ -74,7 +74,7 @@ public class ExtendedChatController {
 				"conversationId", conversationId,
 				"messageCount", chatMemory.get(conversationId).size()
 			);
-			
+
 		} catch (Exception e) {
 			return Map.of(
 				"error", "Failed to process chat: " + e.getMessage(),
@@ -86,7 +86,7 @@ public class ExtendedChatController {
 	private String extractUserIdFromContext(AgentCoreContext context) {
 		// Get Authorization header
 		String authHeader = context.getHeader(AUTHORIZATION_HEADER);
-		
+
 		if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
 			String token = authHeader.substring(BEARER_PREFIX.length());
 			String userId = jwtUtil.extractUserId(token);
@@ -94,7 +94,7 @@ public class ExtendedChatController {
 				return userId;
 			}
 		}
-		
+
 		// Fallback to anonymous user if no user identity found
 		return ANONYMOUS_USER;
 	}

@@ -16,98 +16,115 @@
 
 package org.springaicommunity.agentcore.service;
 
-import org.junit.jupiter.api.BeforeEach;
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 import org.springaicommunity.agentcore.exception.AgentCoreInvocationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class AgentCoreMethodScannerTest {
 
-	@Mock
-	private AgentCoreMethodRegistry mockRegistry;
+	@Test
+	void shouldDiscoverSingleAnnotatedMethod() throws Exception {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		SingleAgent bean = new SingleAgent();
 
-	private AgentCoreMethodScanner scanner;
+		scanner.postProcessAfterInitialization(bean, "singleAgent");
 
-	@BeforeEach
-	void setUp() {
-		scanner = new AgentCoreMethodScanner(mockRegistry);
+		assertThat(scanner.getTarget()).hasValueSatisfying(target -> {
+			assertThat(target.bean()).isSameAs(bean);
+			assertThat(target.method().getName()).isEqualTo("invoke");
+		});
 	}
 
 	@Test
-	void shouldDiscoverAndRegisterAgentCoreInvocationMethod() {
-		var bean = new BeanWithSingleMethod();
+	void shouldDiscoverInheritedAnnotatedMethod() throws Exception {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		ChildAgent bean = new ChildAgent();
 
-		var result = scanner.postProcessAfterInitialization(bean, "testBean");
+		scanner.postProcessAfterInitialization(bean, "childAgent");
 
-		assertThat(result).isSameAs(bean);
-		verify(mockRegistry).registerMethod(eq(bean), any());
+		assertThat(scanner.getTarget()).hasValueSatisfying(target -> {
+			assertThat(target.bean()).isSameAs(bean);
+			assertThat(target.method().getName()).isEqualTo("invoke");
+		});
 	}
 
 	@Test
-	void shouldIgnoreBeansWithoutAgentCoreInvocationMethods() {
-		var bean = new BeanWithoutAnnotation();
+	void shouldThrowWhenMultipleMethodsAnnotatedInSameBean() {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		DuplicateAgent bean = new DuplicateAgent();
 
-		var result = scanner.postProcessAfterInitialization(bean, "testBean");
-
-		assertThat(result).isSameAs(bean);
-		verify(mockRegistry, never()).registerMethod(any(), any());
-	}
-
-	@Test
-	void shouldPropagateRegistryExceptionForMultipleMethods() {
-		var bean = new BeanWithMultipleMethods();
-		doThrow(new AgentCoreInvocationException("Multiple methods")).when(mockRegistry).registerMethod(any(), any());
-
-		assertThatThrownBy(() -> scanner.postProcessAfterInitialization(bean, "testBean"))
+		assertThatThrownBy(() -> scanner.postProcessAfterInitialization(bean, "duplicateAgent"))
 			.isInstanceOf(AgentCoreInvocationException.class)
-			.hasMessage("Multiple methods");
+			.hasMessageContaining("Multiple @AgentCoreInvocation methods found");
 	}
 
-	static class BeanWithSingleMethod {
+	@Test
+	void shouldThrowWhenMultipleBeansEachHaveOneAnnotatedMethod() throws Exception {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		scanner.postProcessAfterInitialization(new SingleAgent(), "first");
+
+		assertThatThrownBy(() -> scanner.postProcessAfterInitialization(new SingleAgent(), "second"))
+			.isInstanceOf(AgentCoreInvocationException.class)
+			.hasMessageContaining("Multiple @AgentCoreInvocation methods found");
+	}
+
+	@Test
+	void shouldReturnEmptyWhenNoBeanIsAnnotated() throws Exception {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		scanner.postProcessAfterInitialization(new Object(), "plain");
+
+		assertThat(scanner.getTarget()).isEmpty();
+	}
+
+	@Test
+	void recordedMethodBelongsToBeanHierarchy() throws Exception {
+		AgentCoreMethodScanner scanner = new AgentCoreMethodScanner();
+		SingleAgent bean = new SingleAgent();
+		scanner.postProcessAfterInitialization(bean, "singleAgent");
+
+		Method recorded = scanner.getTarget().orElseThrow().method();
+		assertThat(recorded.getDeclaringClass()).isAssignableFrom(bean.getClass());
+	}
+
+	static class SingleAgent {
 
 		@AgentCoreInvocation
-		public String handleRequest(String input) {
-			return "response";
-		}
-
-		public void regularMethod() {
-			// Not annotated
+		public String invoke(String prompt) {
+			return "ok " + prompt;
 		}
 
 	}
 
-	static class BeanWithoutAnnotation {
+	static class ParentAgent {
 
-		public String regularMethod(String input) {
-			return "response";
-		}
-
-		public void anotherMethod() {
-			// No annotations
+		@AgentCoreInvocation
+		public String invoke(String prompt) {
+			return "parent " + prompt;
 		}
 
 	}
 
-	static class BeanWithMultipleMethods {
+	static class ChildAgent extends ParentAgent {
+
+		// inherits @AgentCoreInvocation from ParentAgent
+
+	}
+
+	static class DuplicateAgent {
 
 		@AgentCoreInvocation
-		public String firstMethod(String input) {
-			return "response1";
+		public String first(String s) {
+			return s;
 		}
 
 		@AgentCoreInvocation
-		public String secondMethod(String input) {
-			return "response2";
+		public String second(String s) {
+			return s;
 		}
 
 	}

@@ -22,13 +22,27 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.springframework.web.bind.annotation.ResponseBody;
+
 /**
- * Marks a method as an agent invocation handler for the AgentCore runtime. Only one
- * method per application can be annotated with this annotation.
+ * Marks a method as the agent invocation handler for the AgentCore runtime.
+ *
+ * <p>
+ * The annotated method is registered as the Spring MVC handler for
+ * {@code POST /invocations}. The method may declare any parameters that Spring MVC
+ * supports (e.g. {@code @RequestBody}, {@code @Valid}, {@code @RequestHeader}, an
+ * {@link org.springaicommunity.agentcore.context.AgentCoreContext} parameter, etc.) and
+ * may return any type Spring MVC can serialize (POJO, {@code String},
+ * {@code ResponseEntity}, {@code Flux} for SSE streaming, etc.).
+ *
+ * <p>
+ * Only one method per application may be annotated with {@code @AgentCoreInvocation}. If
+ * multiple endpoints are required, define a regular {@code @RestController} instead.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
+@ResponseBody
 public @interface AgentCoreInvocation {
 
 }

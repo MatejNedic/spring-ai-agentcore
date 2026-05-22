@@ -28,6 +28,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +43,7 @@ class AgentCoreIntegrationTest {
 		public static class TestAgentService {
 
 			@AgentCoreInvocation
-			public Map<String, Object> handleRequest(Map<String, Object> request) {
+			public Map<String, Object> handleRequest(@RequestBody Map<String, Object> request) {
 				return Map.of("response", "Integration: " + request.get("message"), "status", "success");
 			}
 

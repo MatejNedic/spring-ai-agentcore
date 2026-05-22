@@ -16,42 +16,54 @@
 
 package org.springaicommunity.agentcore.integration;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
-import org.springaicommunity.agentcore.context.AgentCoreContext;
-import org.springaicommunity.agentcore.context.AgentCoreHeaders;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = EndToEndContextIntegrationTest.ContextTestApp.class,
+/**
+ * Verifies that when a user supplies their own {@code @PostMapping("/invocations")}
+ * controller, the
+ * {@link org.springaicommunity.agentcore.service.AgentCoreInvocationRegistrar} detects
+ * the existing mapping and skips registration of the {@code @AgentCoreInvocation} method,
+ * allowing the user-provided controller to handle requests.
+ */
+@SpringBootTest(classes = EndToEndUserOverrideIntegrationTest.TestApp.class,
 		webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class EndToEndContextIntegrationTest {
+class EndToEndUserOverrideIntegrationTest {
 
 	@SpringBootApplication(scanBasePackages = "org.springaicommunity.agentcore.autoconfigure")
-	static class ContextTestApp {
+	static class TestApp {
 
 		@Service
 		public static class TestAgentService {
 
+			// This SHOULD be ignored because the user-provided controller below already
+			// owns POST /invocations.
 			@AgentCoreInvocation
-			public String handleWithContext(@RequestBody Map<String, String> request, AgentCoreContext context) {
-				String message = request.get("message");
-				String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-				String customHeader = context.getHeader("X-Custom-Header");
-				return "Message: " + message + ", Session: " + sessionId + ", Custom: " + customHeader;
+			public String shouldBeIgnored(String prompt) {
+				return "agentcore: " + prompt;
+			}
+
+		}
+
+		@RestController
+		public static class UserController {
+
+			@PostMapping("/invocations")
+			public String custom(@RequestBody String body) {
+				return "user-override: " + body;
 			}
 
 		}
@@ -65,19 +77,11 @@ class EndToEndContextIntegrationTest {
 	private TestRestTemplate restTemplate;
 
 	@Test
-	void shouldInjectContextWithHeaders() {
-		var request = Map.of("message", "Hello Context");
-
-		var headers = new HttpHeaders();
-		headers.set(AgentCoreHeaders.SESSION_ID, "session-123");
-		headers.set("X-Custom-Header", "custom-value");
-
-		var entity = new HttpEntity<>(request, headers);
-
-		var response = restTemplate.postForEntity("http://localhost:" + port + "/invocations", entity, String.class);
+	void userControllerWinsOverAgentCoreInvocation() {
+		var response = restTemplate.postForEntity("http://localhost:" + port + "/invocations", "Hello", String.class);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getBody()).isEqualTo("Message: Hello Context, Session: session-123, Custom: custom-value");
+		assertThat(response.getBody()).startsWith("user-override:");
 	}
 
 }

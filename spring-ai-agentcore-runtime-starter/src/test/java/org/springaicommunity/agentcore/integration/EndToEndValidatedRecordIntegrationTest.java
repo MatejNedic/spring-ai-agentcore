@@ -16,8 +16,8 @@
 
 package org.springaicommunity.agentcore.integration;
 
-import java.util.Map;
-
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 import org.springaicommunity.agentcore.context.AgentCoreContext;
@@ -32,30 +32,49 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = EndToEndContextIntegrationTest.ContextTestApp.class,
+/**
+ * End-to-end test verifying the canonical {@code @AgentCoreInvocation} signature:
+ *
+ * <pre>{@code
+ * &#64;AgentCoreInvocation
+ * public String invoke(@Valid PersonQuestion question, AgentCoreContext context) { ... }
+ * }</pre>
+ *
+ * <p>
+ * Confirms that:
+ * <ul>
+ * <li>The typed body parameter is deserialized via Spring MVC's standard message
+ * converters (one Jackson read, no annotation required).</li>
+ * <li>{@code @Valid} triggers Jakarta Bean Validation natively.</li>
+ * <li>{@link AgentCoreContext} is injected by
+ * {@link org.springaicommunity.agentcore.service.AgentCoreContextArgumentResolver}.</li>
+ * </ul>
+ */
+@SpringBootTest(classes = EndToEndValidatedRecordIntegrationTest.TestApp.class,
 		webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class EndToEndContextIntegrationTest {
+class EndToEndValidatedRecordIntegrationTest {
 
 	@SpringBootApplication(scanBasePackages = "org.springaicommunity.agentcore.autoconfigure")
-	static class ContextTestApp {
+	static class TestApp {
 
 		@Service
 		public static class TestAgentService {
 
 			@AgentCoreInvocation
-			public String handleWithContext(@RequestBody Map<String, String> request, AgentCoreContext context) {
-				String message = request.get("message");
+			public String invoke(@Valid PersonQuestion question, AgentCoreContext context) {
 				String sessionId = context.getHeader(AgentCoreHeaders.SESSION_ID);
-				String customHeader = context.getHeader("X-Custom-Header");
-				return "Message: " + message + ", Session: " + sessionId + ", Custom: " + customHeader;
+				return "Hello " + question.name() + ", you asked: '" + question.question() + "' (session=" + sessionId
+						+ ")";
 			}
 
 		}
 
+	}
+
+	record PersonQuestion(@NotBlank String name, @NotBlank String question) {
 	}
 
 	@LocalServerPort
@@ -65,19 +84,25 @@ class EndToEndContextIntegrationTest {
 	private TestRestTemplate restTemplate;
 
 	@Test
-	void shouldInjectContextWithHeaders() {
-		var request = Map.of("message", "Hello Context");
-
+	void shouldDeserializeRecordInjectContextAndReturnString() {
 		var headers = new HttpHeaders();
-		headers.set(AgentCoreHeaders.SESSION_ID, "session-123");
-		headers.set("X-Custom-Header", "custom-value");
+		headers.set(AgentCoreHeaders.SESSION_ID, "abc-123");
 
-		var entity = new HttpEntity<>(request, headers);
+		var body = new PersonQuestion("Ada", "What is recursion?");
+		var entity = new HttpEntity<>(body, headers);
 
 		var response = restTemplate.postForEntity("http://localhost:" + port + "/invocations", entity, String.class);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getBody()).isEqualTo("Message: Hello Context, Session: session-123, Custom: custom-value");
+		assertThat(response.getBody()).isEqualTo("Hello Ada, you asked: 'What is recursion?' (session=abc-123)");
+	}
+
+	@Test
+	void shouldRejectInvalidPayloadWith400() {
+		var body = new PersonQuestion("", "");
+		var response = restTemplate.postForEntity("http://localhost:" + port + "/invocations", body, String.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 	}
 
 }

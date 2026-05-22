@@ -1,56 +1,49 @@
 # Spring AI Override Invocations
 
-This example demonstrates how to override `AgentCoreInvocationsController` from the `spring-ai-agentcore-runtime-starter` while still benefiting from the ping endpoint functionality.
+This example demonstrates how to override the auto-configured `POST /invocations`
+endpoint from `spring-ai-agentcore-runtime-starter` while still benefiting from the
+ping endpoint and other starter features.
 
 ## Features
 
-- **Custom Controller Override**: Extends `AgentCoreInvocationsController` to provide custom invocation handling
-- **Ping Endpoint Reuse**: Leverages the built-in `/ping` endpoint from the starter for health monitoring
-- **Spring AI Integration**: Direct integration with ChatClient for AI responses
-- **Selective Starter Benefits**: Uses only the ping functionality while customizing the invocations endpoint
+- **Custom Controller Override**: Provides a hand-written `@PostMapping("/invocations")`
+  in place of the auto-configured handler.
+- **Ping Endpoint Reuse**: Leverages the built-in `/ping` endpoint for health monitoring.
+- **Spring AI Integration**: Direct integration with `ChatClient` for AI responses.
 
-## What This Example Shows
+## How It Works
 
-The example demonstrates how to:
-
-1. **Override the invocations controller** using marker interface approach
-2. **Implement custom request handling** without inheritance constraints
-3. **Maintain health monitoring** through the existing ping endpoint
-4. **Integrate directly with Spring AI** ChatClient
-5. **Zero configuration needed** - just implement the marker interface
+The runtime starter inspects Spring MVC's `RequestMappingHandlerMapping` at startup. If
+it finds an existing `POST /invocations` mapping, it skips registering the
+`@AgentCoreInvocation` handler — your controller wins automatically.
 
 ```java
 @RestController
-public class CustomController implements AgentCoreInvocationsHandler {
-    
+public class CustomController {
+
     @PostMapping(value = "/invocations", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> handleJsonInvocation(@RequestBody Object request, @RequestHeader HttpHeaders headers) {
-        return chatClient.prompt().user((String) request).stream().content();
+    public Flux<String> handleJsonInvocation(@RequestBody String request, @RequestHeader HttpHeaders headers) {
+        return chatClient.prompt().user(request).stream().content();
     }
 }
 ```
 
-## How It Works
-
-1. **Marker Interface**: `CustomController` implements `AgentCoreInvocationsHandler`
-2. **Auto-Discovery**: Spring finds the controller via `@RestController` annotation
-3. **Conditional Skip**: `@ConditionalOnMissingBean(AgentCoreInvocationsHandler.class)` prevents auto-configuration
-4. **No Configuration**: No need for `@Configuration` classes or manual bean definitions
+No marker interface, no `@ConditionalOnMissingBean` — just declare the mapping.
 
 ## API Endpoints
 
-- **Custom invocations**: `POST /invocations` - Custom AI processing with streaming response
-- **Health monitoring**: `GET /ping` - Built-in health check from the starter
+- **Custom invocations**: `POST /invocations` — your custom AI processing with
+  streaming response.
+- **Health monitoring**: `GET /ping` — built-in health check from the starter.
 
 ## Benefits
 
-- **Zero configuration**: Just implement the marker interface and add `@RestController`
-- **No inheritance constraints**: Complete freedom in method signatures and mappings
-- **Selective feature usage**: Use only the ping endpoint from the starter
-- **Full control**: Complete control over request/response handling
-- **No annotation constraints**: No need for `@AgentCoreInvocation` annotation
-- **Direct Spring AI access**: Direct ChatClient integration without method discovery overhead
+- **Zero configuration**: Add `@RestController` + `@PostMapping("/invocations")` and you're done.
+- **No inheritance or interface constraints**: Complete freedom in method signatures and mappings.
+- **Selective feature usage**: Keep using `/ping`, throttling, and other starter features.
+- **Full control**: Complete control over request/response handling.
+- **Direct Spring AI access**: Direct `ChatClient` integration without going through the starter's annotation.
 
 ## Requirements
 

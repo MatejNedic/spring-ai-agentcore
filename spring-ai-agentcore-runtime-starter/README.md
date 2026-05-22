@@ -78,9 +78,13 @@ public MyResponse processWithContext(MyRequest request, AgentCoreContext context
 ```
 
 ### Map Method (Flexible)
+
+`Map` parameters require `@RequestBody` because Spring MVC's built-in `MapMethodProcessor`
+claims unannotated `Map` parameters for model-attribute binding.
+
 ```java
 @AgentCoreInvocation
-public Map<String, Object> processData(Map<String, Object> data) {
+public Map<String, Object> processData(@RequestBody Map<String, Object> data) {
     return Map.of(
         "input", data,
         "response", "Processed: " + data.get("message"),

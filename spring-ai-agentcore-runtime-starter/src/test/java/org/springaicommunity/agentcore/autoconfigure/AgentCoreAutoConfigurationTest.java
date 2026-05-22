@@ -16,18 +16,13 @@
 
 package org.springaicommunity.agentcore.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.springaicommunity.agentcore.controller.AgentCoreInvocationsController;
 import org.springaicommunity.agentcore.controller.AgentCorePingController;
-import org.springaicommunity.agentcore.service.AgentCoreMethodInvoker;
-import org.springaicommunity.agentcore.service.AgentCoreMethodRegistry;
+import org.springaicommunity.agentcore.service.AgentCoreInvocationRegistrar;
 import org.springaicommunity.agentcore.service.AgentCoreMethodScanner;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,64 +32,13 @@ class AgentCoreAutoConfigurationTest {
 		.withConfiguration(AutoConfigurations.of(AgentCoreAutoConfiguration.class));
 
 	@Test
-	void shouldCreateAllBeansWhenAgentCoreInvocationIsPresent() {
+	void shouldCreateCoreBeans() {
 		contextRunner.run(context -> {
-			assertThat(context).hasSingleBean(ObjectMapper.class);
-			assertThat(context).hasSingleBean(AgentCoreMethodRegistry.class);
 			assertThat(context).hasSingleBean(AgentCoreMethodScanner.class);
-			assertThat(context).hasSingleBean(AgentCoreMethodInvoker.class);
-			assertThat(context).hasSingleBean(AgentCoreInvocationsController.class);
+			assertThat(context).hasSingleBean(AgentCoreInvocationRegistrar.class);
+			assertThat(context).hasBean("agentCoreWebMvcConfigurer");
 			assertThat(context).hasSingleBean(AgentCorePingController.class);
 		});
-	}
-
-	@Test
-	void shouldWireBeansCorrectly() {
-		contextRunner.run(context -> {
-			var scanner = context.getBean(AgentCoreMethodScanner.class);
-			var invoker = context.getBean(AgentCoreMethodInvoker.class);
-			var controller = context.getBean(AgentCoreInvocationsController.class);
-
-			assertThat(scanner).isNotNull();
-			assertThat(invoker).isNotNull();
-			assertThat(controller).isNotNull();
-		});
-	}
-
-	@Test
-	void shouldAllowCustomObjectMapperOverride() {
-		contextRunner.withUserConfiguration(CustomObjectMapperConfiguration.class).run(context -> {
-			assertThat(context).hasSingleBean(ObjectMapper.class);
-			assertThat(context.getBean(ObjectMapper.class)).isSameAs(context.getBean("customObjectMapper"));
-		});
-	}
-
-	@Test
-	void shouldAllowCustomRegistryOverride() {
-		contextRunner.withUserConfiguration(CustomRegistryConfiguration.class).run(context -> {
-			assertThat(context).hasSingleBean(AgentCoreMethodRegistry.class);
-			assertThat(context.getBean(AgentCoreMethodRegistry.class)).isSameAs(context.getBean("customRegistry"));
-		});
-	}
-
-	@Configuration
-	static class CustomObjectMapperConfiguration {
-
-		@Bean
-		public ObjectMapper customObjectMapper() {
-			return new ObjectMapper();
-		}
-
-	}
-
-	@Configuration
-	static class CustomRegistryConfiguration {
-
-		@Bean
-		public AgentCoreMethodRegistry customRegistry() {
-			return new AgentCoreMethodRegistry();
-		}
-
 	}
 
 }
