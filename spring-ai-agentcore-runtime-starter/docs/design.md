@@ -193,19 +193,25 @@ Pattern reference: Spring Cloud AWS SNS uses this exact split (`WebMvcConfigurer
 
 ## Critical Assessment
 
-### Why this approach is better
+### Pros
 
-1. **The user's method IS the handler.** No framework controller in between. Spring MVC's full infrastructure applies: `@ResponseBody`, `@ExceptionHandler`, `HandlerInterceptor`, content negotiation, CORS, async support (`Flux`, `DeferredResult`). The user doesn't learn a framework-within-a-framework; they learn Spring MVC.
+1. **User's method is the handler.** No framework controller in between. Spring MVC's full infrastructure applies: `@ResponseBody`, `@ExceptionHandler`, `HandlerInterceptor`, content negotiation, CORS, async support (`Flux`, `DeferredResult`).
+2. **Single Jackson read.** One `HttpMessageConverter.read()` from the raw `InputStream` — no intermediate representations.
+3. **Precomputed metadata.** Body parameter index, validation hints, annotation checks — all resolved once at startup. No reflection at request time.
+4. **Clean separation of concerns.** Scanner finds the method. Registrar wires it. Resolvers handle arguments. Each class does one thing.
+5. **Fail-fast on misconfiguration.** Duplicate methods, missing validator — caught at startup with clear messages.
+6. **Override detection without marker interfaces.** Checks if `POST /invocations` is already mapped. Works with any user controller style.
+7. **Proven patterns.** `SmartInitializingSingleton`, static converter lists, `WebMvcConfigurer` anonymous class — same patterns used in Spring Cloud AWS.
 
-2. **Single Jackson read.** The old triple round-trip (`Object` → `writeValueAsString` → `readValue(targetType)`) is gone. Now it's one `HttpMessageConverter.read()` from the raw `InputStream`.
+### Cons
 
-3. **Precomputed metadata.** Body parameter index, validation hints, annotation checks — all resolved once at startup. Per-request cost is: one converter loop (typically 2 iterations), one `validate` call if needed. No reflection at request time.
-
-4. **Clean separation of concerns.** Scanner finds the method. Registrar wires it. Resolvers handle arguments. Each class does one thing. The patterns (static converter list, `SmartInitializingSingleton`, `WebMvcConfigurer` anonymous class) are proven in production across Spring Cloud AWS.
-
-5. **Fail-fast on misconfiguration.** Duplicate methods, missing validator — both caught at startup with clear messages. No silent runtime failures.
-
-6. **Override detection without marker interfaces.** Just checks if `POST /invocations` is already mapped. Works with any user controller style. No coupling.
+1. **More code.** ~350 lines vs ~260 in the old implementation. More classes (5 service + 1 record vs 4 in the old design).
+2. **`RequestMappingHandlerMapping` name-based lookup.** Required because Actuator introduces a second `RequestMappingHandlerMapping` bean. Fragile if Spring ever renames the bean (unlikely but not impossible).
+3. **Static converter list.** `DEFAULT_MESSAGE_CONVERTERS` doesn't pick up user-customized `ObjectMapper` or additional converters registered via `WebMvcConfigurer.extendMessageConverters`. Users who need custom serialization must use `@RequestBody` (which goes through Spring's converter chain).
+4. **Annotation detection list is manual.** `hasSpringMvcAnnotation` enumerates 8 annotations explicitly. A new Spring MVC binding annotation in a future version would need to be added manually.
+5. **Single method per app.** Architectural constraint — users wanting multiple endpoints must fall back to a regular `@RestController`. No multi-method routing.
+6. **Servlet-only.** WebFlux requires a separate starter with mirrored classes (different resolver interface, different handler mapping, different body reading API).
+7. **`Map` parameters need `@RequestBody`.** Spring's built-in `MapMethodProcessor` claims unannotated `Map` params first. Not a bug we introduced, but a UX friction point users will hit.
 
 ### Remaining rough edges
 
