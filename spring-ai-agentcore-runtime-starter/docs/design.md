@@ -233,5 +233,3 @@ Pattern reference: Spring Cloud AWS SNS uses this exact split (`WebMvcConfigurer
 | Features | Single method, no validation, no override detection, no flexible params | Single method, `@Valid`, override detection, full Spring MVC params |
 | Spring MVC integration | Partial (own controller, own deserialization) | Full (user method IS the handler) |
 | Patterns | Custom, ad-hoc | Matches Spring Cloud AWS SNS, Spring Boot conventions |
-
-The new code is ~90 lines longer but does significantly more, and the patterns are recognizable to anyone who's worked with Spring Boot starters or Spring Cloud.
