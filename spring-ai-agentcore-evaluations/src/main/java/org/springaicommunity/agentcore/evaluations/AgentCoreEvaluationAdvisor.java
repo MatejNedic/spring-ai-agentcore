@@ -32,7 +32,10 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.agentcore.evaluations.spans.SpanEventBuilder;
+import org.springaicommunity.agentcore.evaluations.client.AgentCoreEvaluationClient;
+import org.springaicommunity.agentcore.evaluations.client.EvaluationEvent;
+import org.springaicommunity.agentcore.evaluations.client.EvaluationResult;
+import org.springaicommunity.agentcore.evaluations.client.SpanEventBuilder;
 import reactor.core.publisher.Flux;
 
 import org.springframework.ai.chat.client.ChatClientRequest;

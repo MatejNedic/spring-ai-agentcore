@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.evaluations;
+package org.springaicommunity.agentcore.evaluations.client;
 
 /**
  * Result from an AgentCore evaluation.

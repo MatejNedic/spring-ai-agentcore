@@ -1,7 +1,7 @@
 /*
  * Copyright 2025-2025 the original author or authors.
  */
-package org.springaicommunity.agentcore.evaluations;
+package org.springaicommunity.agentcore.evaluations.client;
 
 import java.util.HashMap;
 import java.util.List;
