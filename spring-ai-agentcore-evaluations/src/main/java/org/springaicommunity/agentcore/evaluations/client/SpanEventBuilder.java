@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.evaluations.spans;
+package org.springaicommunity.agentcore.evaluations.client;
 
 import java.time.Instant;
 import java.util.ArrayList;

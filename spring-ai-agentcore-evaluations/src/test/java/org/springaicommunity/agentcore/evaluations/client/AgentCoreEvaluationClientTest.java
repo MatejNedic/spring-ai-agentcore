@@ -8,7 +8,7 @@
  *      https://www.apache.org/licenses/LICENSE-2.0
  */
 
-package org.springaicommunity.agentcore.evaluations;
+package org.springaicommunity.agentcore.evaluations.client;
 
 import java.util.HashMap;
 import java.util.List;

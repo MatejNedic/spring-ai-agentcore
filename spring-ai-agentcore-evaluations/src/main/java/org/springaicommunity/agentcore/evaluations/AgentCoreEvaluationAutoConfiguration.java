@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.evaluations.autoconfigure;
+package org.springaicommunity.agentcore.evaluations;
 
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springaicommunity.agentcore.evaluations.AgentCoreEvaluationAdvisor;
-import org.springaicommunity.agentcore.evaluations.AgentCoreEvaluationClient;
-import org.springaicommunity.agentcore.evaluations.AgentCoreEvaluationMetrics;
-import org.springaicommunity.agentcore.evaluations.AgentCoreEvaluationProperties;
+import org.springaicommunity.agentcore.evaluations.client.AgentCoreEvaluationClient;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

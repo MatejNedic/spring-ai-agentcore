@@ -7,7 +7,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.agentcore.evaluations.AgentCoreEvaluationAdvisor;
-import org.springaicommunity.agentcore.evaluations.EvaluationResult;
+import org.springaicommunity.agentcore.evaluations.client.EvaluationResult;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.beans.factory.annotation.Value;
