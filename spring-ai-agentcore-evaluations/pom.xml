@@ -17,11 +17,11 @@
         <developerConnection>git@github.com/spring-ai-community/spring-ai-agentcore.git</developerConnection>
     </scm>
 
-    <artifactId>spring-ai-agentcore-browser</artifactId>
+    <artifactId>spring-ai-agentcore-evaluations</artifactId>
     <packaging>jar</packaging>
 
-    <name>Spring AI AgentCore Browser</name>
-    <description>Spring AI integration with Amazon AgentCore Browser</description>
+    <name>Spring AI AgentCore Evaluations</name>
+    <description>AgentCore Evaluations integration for Spring AI - evaluate agent responses using Amazon Bedrock AgentCore Evaluate API</description>
 
     <organization>
         <name>Spring AI Community</name>
@@ -37,8 +37,8 @@
 
     <developers>
         <developer>
-            <name>Yuriy Bezsonov</name>
-            <email>ybezsonov@gmail.com</email>
+            <name>Andrei Shakirin</name>
+            <email>andrei.shakirin@gmail.com</email>
         </developer>
     </developers>
 
@@ -59,19 +59,13 @@
 
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-model</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-client-chat</artifactId>
             <optional>true</optional>
         </dependency>
 
         <dependency>
-            <groupId>org.springaicommunity</groupId>
-            <artifactId>spring-ai-agentcore-common</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
 
         <dependency>
@@ -79,38 +73,17 @@
             <artifactId>bedrockagentcore</artifactId>
         </dependency>
 
+        <!-- Optional Micrometer support -->
         <dependency>
-            <groupId>org.springaicommunity</groupId>
-            <artifactId>spring-ai-agentcore-artifact-store</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.microsoft.playwright</groupId>
-            <artifactId>playwright</artifactId>
-            <version>1.60.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-bedrock-converse</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -138,19 +111,6 @@
                         <exclude>**/*IT.java</exclude>
                     </excludes>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.5.4</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
