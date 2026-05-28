@@ -89,6 +89,11 @@
             </dependency>
             <dependency>
                 <groupId>org.springaicommunity</groupId>
+                <artifactId>spring-ai-agentcore-evaluations</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springaicommunity</groupId>
                 <artifactId>spring-ai-agentcore-identity</artifactId>
                 <version>${project.version}</version>
             </dependency>
