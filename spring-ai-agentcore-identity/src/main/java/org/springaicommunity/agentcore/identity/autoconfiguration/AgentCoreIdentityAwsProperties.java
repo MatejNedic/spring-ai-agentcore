@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springaicommunity.agentcore.identity.autoconfiguration;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.NestedConfigurationProperty;
-import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode;
+package org.springaicommunity.agentcore.identity.autoconfiguration;
 
 import java.net.URI;
 import java.time.Duration;
+
+import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 /**
  * Configuration properties for CredentialsProvider.
@@ -30,6 +32,9 @@ import java.time.Duration;
 @ConfigurationProperties(AgentCoreIdentityAwsProperties.CONFIG_PREFIX)
 public class AgentCoreIdentityAwsProperties {
 
+	/**
+	 * configuration prefix for AgentCore Identity AWS properties.
+	 */
 	public static final String CONFIG_PREFIX = "agentcore.identity";
 
 	/**
@@ -180,7 +185,7 @@ public class AgentCoreIdentityAwsProperties {
 	}
 
 	public Profile getProfile() {
-		return profile;
+		return this.profile;
 	}
 
 	public void setProfile(Profile profile) {

@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springaicommunity.agentcore.identity.core;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.Oauth2FlowType;
 
-import java.util.List;
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
-class GetResourceOauth2TokenConsumerTest {
+class GetResourceOauth2TokenConsumerTests {
 
 	@Test
 	void ofBuildsConsumerWithAllFields() {
 		GetResourceOauth2TokenConsumer consumer = GetResourceOauth2TokenConsumer
-			.of(c -> c.workloadIdentityToken("wit-123")
+			.of((c) -> c.workloadIdentityToken("wit-123")
 				.resourceCredentialProviderName("my-provider")
 				.scopes("read", "write")
 				.oauth2Flow(Oauth2FlowType.M2_M)
@@ -56,7 +58,7 @@ class GetResourceOauth2TokenConsumerTest {
 	@Test
 	void scopesVarargsDelegatesToCollection() {
 		GetResourceOauth2TokenConsumer consumer = GetResourceOauth2TokenConsumer
-			.of(c -> c.workloadIdentityToken("wit").resourceCredentialProviderName("p").scopes("a", "b", "c"));
+			.of((c) -> c.workloadIdentityToken("wit").resourceCredentialProviderName("p").scopes("a", "b", "c"));
 
 		GetResourceOauth2TokenRequest.Builder builder = GetResourceOauth2TokenRequest.builder();
 		consumer.accept(builder);
@@ -66,21 +68,21 @@ class GetResourceOauth2TokenConsumerTest {
 	@Test
 	void rejectsNullWorkloadIdentityToken() {
 		assertThatIllegalArgumentException()
-			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of(c -> c.workloadIdentityToken(null)));
+			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.workloadIdentityToken(null)));
 	}
 
 	@Test
 	void rejectsEmptyResourceCredentialProviderName() {
 		assertThatIllegalArgumentException().isThrownBy(() -> GetResourceOauth2TokenConsumer
-			.of(c -> c.workloadIdentityToken("t").resourceCredentialProviderName("")));
+			.of((c) -> c.workloadIdentityToken("t").resourceCredentialProviderName("")));
 	}
 
 	@Test
 	void rejectsNullScopes() {
 		assertThatIllegalArgumentException()
-			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of(c -> c.workloadIdentityToken("t")
+			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.workloadIdentityToken("t")
 				.resourceCredentialProviderName("p")
-				.scopes((java.util.Collection<String>) null)));
+				.scopes((Collection<String>) null)));
 	}
 
 }

@@ -14,37 +14,8 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.identity.autoconfiguration;
-
-import org.springframework.lang.Nullable;
-
 /**
- * Profile AWS credentials properties.
- *
- * @author Matej Nedic
+ * core API for Amazon Bedrock AgentCore Identity: workload access tokens, API keys, and
+ * OAuth 2.0 token retrieval from the credential vault.
  */
-public class Profile {
-
-	@Nullable
-	private String name;
-
-	@Nullable
-	private String path;
-
-	public String getName() {
-		return this.name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public String getPath() {
-		return this.path;
-	}
-
-	public void setPath(String path) {
-		this.path = path;
-	}
-
-}
+package org.springaicommunity.agentcore.identity.core;

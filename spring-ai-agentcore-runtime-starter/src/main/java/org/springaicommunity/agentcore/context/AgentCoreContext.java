@@ -18,9 +18,6 @@ package org.springaicommunity.agentcore.context;
 
 import org.springframework.http.HttpHeaders;
 
-import static org.springaicommunity.agentcore.context.AgentCoreHeaders.USER_ID;
-import static org.springaicommunity.agentcore.context.AgentCoreHeaders.WORKLOAD_ACCESS_TOKEN_RUNTIME;
-
 /**
  * Context object containing HTTP headers from AgentCore invocation requests.
  *
@@ -81,7 +78,7 @@ public class AgentCoreContext {
 	 * Runtime
 	 */
 	public String getWorkloadAccessToken() {
-		return headers.getFirst(WORKLOAD_ACCESS_TOKEN_RUNTIME);
+		return this.headers.getFirst(AgentCoreHeaders.WORKLOAD_ACCESS_TOKEN_RUNTIME);
 	}
 
 	/**
@@ -91,7 +88,7 @@ public class AgentCoreContext {
 	 * invocation
 	 */
 	public String getUserId() {
-		return headers.getFirst(USER_ID);
+		return this.headers.getFirst(AgentCoreHeaders.USER_ID);
 	}
 
 }

@@ -16,12 +16,13 @@
 
 package org.springaicommunity.agentcore.identity.core;
 
-import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenRequest;
-import software.amazon.awssdk.services.bedrockagentcore.model.Oauth2FlowType;
-
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenRequest;
+import software.amazon.awssdk.services.bedrockagentcore.model.Oauth2FlowType;
 
 /**
  * Consumer impl for configuring a {@link GetResourceOauth2TokenRequest} via a fluent
@@ -38,7 +39,7 @@ public interface GetResourceOauth2TokenConsumer extends Consumer<GetResourceOaut
 	GetResourceOauth2TokenConsumer scopes(Collection<String> scopes);
 
 	default GetResourceOauth2TokenConsumer scopes(String... scopes) {
-		return scopes(java.util.Arrays.asList(scopes));
+		return this.scopes(Arrays.asList(scopes));
 	}
 
 	GetResourceOauth2TokenConsumer oauth2Flow(Oauth2FlowType oauth2Flow);

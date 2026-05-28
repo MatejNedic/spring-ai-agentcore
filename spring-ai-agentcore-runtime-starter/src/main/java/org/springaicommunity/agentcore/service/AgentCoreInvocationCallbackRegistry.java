@@ -30,7 +30,7 @@ public class AgentCoreInvocationCallbackRegistry {
 	private final List<AgentCoreInvocationCallback> callbacks;
 
 	public AgentCoreInvocationCallbackRegistry(List<AgentCoreInvocationCallback> callbacks) {
-		this.callbacks = Collections.unmodifiableList(callbacks != null ? callbacks : List.of());
+		this.callbacks = Collections.unmodifiableList((callbacks != null) ? callbacks : List.of());
 	}
 
 	public List<AgentCoreInvocationCallback> getCallbacks() {

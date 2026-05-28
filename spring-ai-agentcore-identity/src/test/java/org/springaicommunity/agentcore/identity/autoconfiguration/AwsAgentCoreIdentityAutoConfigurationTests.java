@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springaicommunity.agentcore.identity.autoconfiguration;
+
+import java.net.URI;
 
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AwsAgentCoreIdentityAutoConfigurationTest {
+class AwsAgentCoreIdentityAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(AwsCredentialsAndRegionAutoConfiguration.class,
@@ -33,16 +40,12 @@ class AwsAgentCoreIdentityAutoConfigurationTest {
 
 	@Test
 	void createsBedrockAgentCoreClient() {
-		this.contextRunner.run(context -> {
-			assertThat(context).hasSingleBean(BedrockAgentCoreClient.class);
-		});
+		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(BedrockAgentCoreClient.class));
 	}
 
 	@Test
 	void createsAgentCoreIdentityTemplate() {
-		this.contextRunner.run(context -> {
-			assertThat(context).hasSingleBean(AgentCoreIdentityTemplate.class);
-		});
+		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(AgentCoreIdentityTemplate.class));
 	}
 
 	@Test
@@ -50,14 +53,11 @@ class AwsAgentCoreIdentityAutoConfigurationTest {
 		this.contextRunner
 			.withBean(BedrockAgentCoreClient.class,
 					() -> BedrockAgentCoreClient.builder()
-						.region(software.amazon.awssdk.regions.Region.US_EAST_1)
-						.credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
-							.create(software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("a", "b")))
-						.endpointOverride(java.net.URI.create("http://localhost:4566"))
+						.region(Region.US_EAST_1)
+						.credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("a", "b")))
+						.endpointOverride(URI.create("http://localhost:4566"))
 						.build())
-			.run(context -> {
-				assertThat(context).hasSingleBean(BedrockAgentCoreClient.class);
-			});
+			.run((context) -> assertThat(context).hasSingleBean(BedrockAgentCoreClient.class));
 	}
 
 }

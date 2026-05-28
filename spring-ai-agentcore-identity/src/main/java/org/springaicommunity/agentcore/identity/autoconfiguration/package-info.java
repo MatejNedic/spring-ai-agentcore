@@ -14,37 +14,8 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.identity.autoconfiguration;
-
-import org.springframework.lang.Nullable;
-
 /**
- * Profile AWS credentials properties.
- *
- * @author Matej Nedic
+ * spring boot auto-configuration for AgentCore Identity, including the AWS SDK client and
+ * the {@code AgentCoreIdentityTemplate} bean.
  */
-public class Profile {
-
-	@Nullable
-	private String name;
-
-	@Nullable
-	private String path;
-
-	public String getName() {
-		return this.name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public String getPath() {
-		return this.path;
-	}
-
-	public void setPath(String path) {
-		this.path = path;
-	}
-
-}
+package org.springaicommunity.agentcore.identity.autoconfiguration;

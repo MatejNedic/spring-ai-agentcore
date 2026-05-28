@@ -16,12 +16,13 @@
 
 package org.springaicommunity.agentcore.identity.core;
 
-import org.springframework.util.Assert;
+import java.util.Collection;
+import java.util.Map;
+
 import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.Oauth2FlowType;
 
-import java.util.Collection;
-import java.util.Map;
+import org.springframework.util.Assert;
 
 /**
  * Default implementation of {@link GetResourceOauth2TokenConsumer}.

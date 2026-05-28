@@ -13,11 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springaicommunity.agentcore.identity.autoconfiguration;
 
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenCallback;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenHolder;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.providers.AwsRegionProvider;
+import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClientBuilder;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -26,14 +33,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
-import software.amazon.awssdk.regions.providers.AwsRegionProvider;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClientBuilder;
 
 /**
- * Autoconfiguration for Bedrock AWS SDK client and {@link AgentCoreIdentityTemplate}
+ * Autoconfiguration for Bedrock AWS SDK client and {@link AgentCoreIdentityTemplate}.
  *
  * @author Matej Nedic
  */
@@ -49,7 +51,7 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 		var builder = BedrockAgentCoreClient.builder()
 			.region(awsRegionProvider.getRegion())
 			.credentialsProvider(awsCredentialsProvider)
-			.overrideConfiguration(c -> c.apiCallTimeout(agentCoreIdentityAwsProperties.getTimeout()));
+			.overrideConfiguration((c) -> c.apiCallTimeout(agentCoreIdentityAwsProperties.getTimeout()));
 		if (agentCoreIdentityAwsProperties.getEndpoint() != null) {
 			builder.endpointOverride(agentCoreIdentityAwsProperties.getEndpoint());
 		}
@@ -64,24 +66,6 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 		return new AgentCoreIdentityTemplate(bedrockAgentCoreClient, holderProvider.getIfAvailable());
 	}
 
-	@Configuration
-	@ConditionalOnClass(name = "org.springaicommunity.agentcore.service.AgentCoreInvocationCallback")
-	static class WorkloadAccessTokenConfiguration {
-
-		@Bean
-		@ConditionalOnMissingBean
-		public WorkloadAccessTokenHolder workloadAccessTokenHolder() {
-			return new WorkloadAccessTokenHolder();
-		}
-
-		@Bean
-		@ConditionalOnMissingBean
-		public WorkloadAccessTokenCallback workloadAccessTokenCallback(WorkloadAccessTokenHolder holder) {
-			return new WorkloadAccessTokenCallback(holder);
-		}
-
-	}
-
 	public static void configureSyncHttpClient(BedrockAgentCoreClientBuilder builder,
 			AgentCoreIdentityAwsProperties agentCoreIdentityAwsProperties) {
 		SyncClientProperties properties = agentCoreIdentityAwsProperties.getSyncClient();
@@ -94,6 +78,24 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 			propertyMapper.from(properties::getSocketTimeout).to(httpClientBuilder::socketTimeout);
 			builder.httpClientBuilder(httpClientBuilder);
 		}
+	}
+
+	@Configuration
+	@ConditionalOnClass(name = "org.springaicommunity.agentcore.service.AgentCoreInvocationCallback")
+	static class WorkloadAccessTokenConfiguration {
+
+		@Bean
+		@ConditionalOnMissingBean
+		WorkloadAccessTokenHolder workloadAccessTokenHolder() {
+			return new WorkloadAccessTokenHolder();
+		}
+
+		@Bean
+		@ConditionalOnMissingBean
+		WorkloadAccessTokenCallback workloadAccessTokenCallback(WorkloadAccessTokenHolder holder) {
+			return new WorkloadAccessTokenCallback(holder);
+		}
+
 	}
 
 }

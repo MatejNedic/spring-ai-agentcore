@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springaicommunity.agentcore.identity.core;
 
 import java.util.function.Consumer;
 
+import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 /**
  * Template providing access to Amazon Bedrock AgentCore Identity operations.
@@ -66,7 +68,7 @@ public class AgentCoreIdentityTemplate {
 	public String getWorkloadAccessTokenForJwt(String jwt, String workloadName) {
 		Assert.hasText(jwt, "jwt must not be null or empty");
 		Assert.hasText(workloadName, "workloadName must not be null or empty");
-		return this.client.getWorkloadAccessTokenForJWT(r -> r.userToken(jwt).workloadName(workloadName))
+		return this.client.getWorkloadAccessTokenForJWT((r) -> r.userToken(jwt).workloadName(workloadName))
 			.workloadAccessToken();
 	}
 
@@ -82,7 +84,7 @@ public class AgentCoreIdentityTemplate {
 	public String getWorkloadAccessTokenForUserId(String userId, String workloadName) {
 		Assert.hasText(userId, "userId must not be null or empty");
 		Assert.hasText(workloadName, "workloadName must not be null or empty");
-		return this.client.getWorkloadAccessTokenForUserId(r -> r.userId(userId).workloadName(workloadName).build())
+		return this.client.getWorkloadAccessTokenForUserId((r) -> r.userId(userId).workloadName(workloadName).build())
 			.workloadAccessToken();
 	}
 
@@ -94,7 +96,7 @@ public class AgentCoreIdentityTemplate {
 	 */
 	public String getWorkloadAccessToken(String workloadName) {
 		Assert.hasText(workloadName, "workloadName must not be null or empty");
-		return this.client.getWorkloadAccessToken(r -> r.workloadName(workloadName).build()).workloadAccessToken();
+		return this.client.getWorkloadAccessToken((r) -> r.workloadName(workloadName).build()).workloadAccessToken();
 	}
 
 	/**
@@ -109,7 +111,7 @@ public class AgentCoreIdentityTemplate {
 		Assert.hasText(workloadIdentityToken, "workloadIdentityToken must not be null or empty");
 		Assert.hasText(resourceName, "resourceName must not be null or empty");
 		return this.client
-			.getResourceApiKey(r -> r.workloadIdentityToken(workloadIdentityToken)
+			.getResourceApiKey((r) -> r.workloadIdentityToken(workloadIdentityToken)
 				.resourceCredentialProviderName(resourceName)
 				.build())
 			.apiKey();
@@ -131,7 +133,7 @@ public class AgentCoreIdentityTemplate {
 		String token = this.workloadAccessTokenHolder.get();
 		Assert.state(token != null, "No workload access token available on the current thread. "
 				+ "Ensure this method is called within an @AgentCoreInvocation context.");
-		return getApiKey(token, resourceName);
+		return this.getApiKey(token, resourceName);
 	}
 
 	/**
@@ -157,7 +159,7 @@ public class AgentCoreIdentityTemplate {
 		Assert.hasText(sessionUri, "sessionUri must not be null or empty");
 		Assert.hasText(userToken, "userToken must not be null or empty");
 		this.client
-			.completeResourceTokenAuth(r -> r.sessionUri(sessionUri).userIdentifier(u -> u.userToken(userToken)));
+			.completeResourceTokenAuth((r) -> r.sessionUri(sessionUri).userIdentifier((u) -> u.userToken(userToken)));
 	}
 
 	/**
@@ -168,7 +170,7 @@ public class AgentCoreIdentityTemplate {
 	public void completeResourceTokenAuthForUserId(String sessionUri, String userId) {
 		Assert.hasText(sessionUri, "sessionUri must not be null or empty");
 		Assert.hasText(userId, "userId must not be null or empty");
-		this.client.completeResourceTokenAuth(r -> r.sessionUri(sessionUri).userIdentifier(u -> u.userId(userId)));
+		this.client.completeResourceTokenAuth((r) -> r.sessionUri(sessionUri).userIdentifier((u) -> u.userId(userId)));
 	}
 
 }

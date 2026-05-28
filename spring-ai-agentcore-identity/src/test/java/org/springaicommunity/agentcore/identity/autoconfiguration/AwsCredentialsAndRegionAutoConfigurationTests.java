@@ -13,25 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springaicommunity.agentcore.identity.autoconfiguration;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AwsCredentialsAndRegionAutoConfigurationTest {
+class AwsCredentialsAndRegionAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(AwsCredentialsAndRegionAutoConfiguration.class));
 
 	@Test
 	void createsRegionProviderWithConfiguredRegion() {
-		this.contextRunner.withPropertyValues("agentcore.identity.region=eu-west-1").run(context -> {
+		this.contextRunner.withPropertyValues("agentcore.identity.region=eu-west-1").run((context) -> {
 			assertThat(context).hasSingleBean(AwsRegionProvider.class);
 			assertThat(context.getBean(AwsRegionProvider.class).getRegion()).isEqualTo(Region.EU_WEST_1);
 		});
@@ -41,7 +43,7 @@ class AwsCredentialsAndRegionAutoConfigurationTest {
 	void createsCredentialsProviderWithStaticCredentials() {
 		this.contextRunner
 			.withPropertyValues("agentcore.identity.access-key=testKey", "agentcore.identity.secret-key=testSecret")
-			.run(context -> {
+			.run((context) -> {
 				assertThat(context).hasSingleBean(AwsCredentialsProvider.class);
 				var creds = context.getBean(AwsCredentialsProvider.class).resolveCredentials();
 				assertThat(creds.accessKeyId()).isEqualTo("testKey");
@@ -51,16 +53,13 @@ class AwsCredentialsAndRegionAutoConfigurationTest {
 
 	@Test
 	void createsDefaultCredentialsProviderWhenNoStaticCredentials() {
-		this.contextRunner.run(context -> {
-			assertThat(context).hasSingleBean(AwsCredentialsProvider.class);
-		});
+		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(AwsCredentialsProvider.class));
 	}
 
 	@Test
 	void defaultRegionIsUsEast1() {
-		this.contextRunner.run(context -> {
-			assertThat(context.getBean(AwsRegionProvider.class).getRegion()).isEqualTo(Region.US_EAST_1);
-		});
+		this.contextRunner.run((context) -> assertThat(context.getBean(AwsRegionProvider.class).getRegion())
+			.isEqualTo(Region.US_EAST_1));
 	}
 
 }

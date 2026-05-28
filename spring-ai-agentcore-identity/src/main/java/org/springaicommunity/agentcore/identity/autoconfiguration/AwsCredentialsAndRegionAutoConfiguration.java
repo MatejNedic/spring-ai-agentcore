@@ -16,11 +16,10 @@
 
 package org.springaicommunity.agentcore.identity.autoconfiguration;
 
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.util.StringUtils;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
@@ -35,9 +34,11 @@ import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.util.StringUtils;
 
 /**
  * Auto-configuration for AWS credentials, region, and {@link BedrockAgentCoreClient}.
@@ -63,7 +64,7 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 		List<AwsCredentialsProvider> providers = new ArrayList<>();
 
 		if (StringUtils.hasText(properties.getAccessKey()) && StringUtils.hasText(properties.getSecretKey())) {
-			providers.add(createStaticCredentialsProvider(properties));
+			providers.add(this.createStaticCredentialsProvider(properties));
 		}
 
 		if (properties.isInstanceProfile()) {
@@ -111,8 +112,8 @@ public class AwsCredentialsAndRegionAutoConfiguration {
 			try {
 				this.region = Region.of(region);
 			}
-			catch (IllegalArgumentException e) {
-				throw new IllegalArgumentException("The region '" + region + "' is not a valid region!", e);
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException("The region '" + region + "' is not a valid region!", ex);
 			}
 		}
 
