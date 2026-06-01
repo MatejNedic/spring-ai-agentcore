@@ -19,18 +19,12 @@ package org.springaicommunity.agentcore.identity.autoconfiguration;
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenCallback;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenHolder;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
-import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
-import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClientBuilder;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -40,23 +34,12 @@ import org.springframework.context.annotation.Configuration;
  * @author Matej Nedic
  */
 @AutoConfiguration
-@AutoConfigureAfter({ AwsCredentialsAndRegionAutoConfiguration.class })
 public class AwsAgentCoreIdentityAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public BedrockAgentCoreClient bedrockAgentCoreClient(AwsRegionProvider awsRegionProvider,
-			AwsCredentialsProvider awsCredentialsProvider,
-			AgentCoreIdentityAwsProperties agentCoreIdentityAwsProperties) {
-		var builder = BedrockAgentCoreClient.builder()
-			.region(awsRegionProvider.getRegion())
-			.credentialsProvider(awsCredentialsProvider)
-			.overrideConfiguration((c) -> c.apiCallTimeout(agentCoreIdentityAwsProperties.getTimeout()));
-		if (agentCoreIdentityAwsProperties.getEndpoint() != null) {
-			builder.endpointOverride(agentCoreIdentityAwsProperties.getEndpoint());
-		}
-		configureSyncHttpClient(builder, agentCoreIdentityAwsProperties);
-		return builder.build();
+	public BedrockAgentCoreClient bedrockAgentCoreClient() {
+		return BedrockAgentCoreClient.create();
 	}
 
 	@Bean
@@ -64,20 +47,6 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 	public AgentCoreIdentityTemplate agentCoreIdentityTemplate(BedrockAgentCoreClient bedrockAgentCoreClient,
 			ObjectProvider<WorkloadAccessTokenHolder> holderProvider) {
 		return new AgentCoreIdentityTemplate(bedrockAgentCoreClient, holderProvider.getIfAvailable());
-	}
-
-	public static void configureSyncHttpClient(BedrockAgentCoreClientBuilder builder,
-			AgentCoreIdentityAwsProperties agentCoreIdentityAwsProperties) {
-		SyncClientProperties properties = agentCoreIdentityAwsProperties.getSyncClient();
-		if (properties != null) {
-			var httpClientBuilder = ApacheHttpClient.builder();
-			PropertyMapper propertyMapper = PropertyMapper.get();
-			propertyMapper.from(properties::getConnectionAcquisitionTimeout)
-				.to(httpClientBuilder::connectionAcquisitionTimeout);
-			propertyMapper.from(properties::getConnectionTimeout).to(httpClientBuilder::connectionTimeout);
-			propertyMapper.from(properties::getSocketTimeout).to(httpClientBuilder::socketTimeout);
-			builder.httpClientBuilder(httpClientBuilder);
-		}
 	}
 
 	@Configuration

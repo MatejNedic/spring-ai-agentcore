@@ -33,19 +33,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AwsAgentCoreIdentityAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(AwsCredentialsAndRegionAutoConfiguration.class,
-				AwsAgentCoreIdentityAutoConfiguration.class))
-		.withPropertyValues("agentcore.identity.access-key=test", "agentcore.identity.secret-key=test",
-				"agentcore.identity.endpoint=http://localhost:4566");
+		.withConfiguration(AutoConfigurations.of(AwsAgentCoreIdentityAutoConfiguration.class));
 
 	@Test
 	void createsBedrockAgentCoreClient() {
-		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(BedrockAgentCoreClient.class));
+		this.contextRunner
+			.withBean(BedrockAgentCoreClient.class,
+					() -> BedrockAgentCoreClient.builder()
+						.region(Region.US_EAST_1)
+						.credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("a", "b")))
+						.endpointOverride(URI.create("http://localhost:4566"))
+						.build())
+			.run((context) -> assertThat(context).hasSingleBean(BedrockAgentCoreClient.class));
 	}
 
 	@Test
 	void createsAgentCoreIdentityTemplate() {
-		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(AgentCoreIdentityTemplate.class));
+		this.contextRunner
+			.withBean(BedrockAgentCoreClient.class,
+					() -> BedrockAgentCoreClient.builder()
+						.region(Region.US_EAST_1)
+						.credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("a", "b")))
+						.endpointOverride(URI.create("http://localhost:4566"))
+						.build())
+			.run((context) -> assertThat(context).hasSingleBean(AgentCoreIdentityTemplate.class));
 	}
 
 	@Test
