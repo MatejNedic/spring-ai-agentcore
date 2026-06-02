@@ -28,7 +28,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryNamespace;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryRetriever;
 import org.springaicommunity.agentcore.memory.longterm.AgentCoreLongTermMemoryRetriever.MemoryRecord;
-import org.springaicommunity.agentcore.memory.shorttem.AgentCoreShortTermMemoryRepository;
+import org.springaicommunity.agentcore.memory.shortterm.AgentCoreShortTermMemoryRepository;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 import org.springframework.ai.chat.client.ChatClient;
@@ -150,7 +150,7 @@ public abstract class AgentCoreMemoryIT {
 				true);
 
 		// Use Integer.MAX_VALUE for unlimited window - actual limit controlled by
-		// agentcore.memory.total-events-limit property
+		// agentcore.memory.short-term.total-events-limit property
 		var chatMemory = MessageWindowChatMemory.builder()
 			.chatMemoryRepository(stmRepository)
 			.maxMessages(Integer.MAX_VALUE)

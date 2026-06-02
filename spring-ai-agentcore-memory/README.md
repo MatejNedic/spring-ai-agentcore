@@ -55,12 +55,31 @@ LTM advisors run **before** STM advisor (lower order = earlier execution):
 ```yaml
 agentcore:
   memory:
-    memory-id: your-memory-id                    # Required: AgentCore Memory ID
-    total-events-limit: 100                      # Optional: Max events to retrieve (context window)
-    default-session: default-session             # Optional: Default session name
-    page-size: 50                               # Optional: API pagination size
-    ignore-unknown-roles: false                 # Optional: Handle unknown message roles
+    memory-id: your-memory-id                    # Required: AgentCore Memory ID (shared with LTM)
+    short-term:
+      total-events-limit: 100                    # Optional: Max events to retrieve (context window)
+      default-session: default-session           # Optional: Default session name
+      page-size: 50                              # Optional: API pagination size
 ```
+
+> **Migration (1.1.0):** STM-only properties moved from `agentcore.memory.*` to
+> `agentcore.memory.short-term.*` for consistency with `agentcore.memory.long-term.*`.
+> The old keys still work in 1.1.x but log a deprecation warning at startup and will
+> be removed in a future release. See
+> [issue #49](https://github.com/spring-ai-community/spring-ai-agentcore/issues/49).
+>
+> The default of `ignore-unknown-roles` has changed from `false` to `true`. Spring AI
+> 2.0.0-M7+ runs tool execution at the advisor layer, which routes `ToolResponseMessage`
+> through `ChatMemory.add(...)`. With the previous default the repository threw
+> `IllegalStateException: Unsupported message type` on any tool-using turn. The new
+> default skips non-dialogue messages (`TOOL`, `OTHER`) instead, which is the only
+> sensible behaviour for M7+ agents — tool results are point-in-time facts that
+> should not be persisted into conversation history. The property itself
+> (`ignore-unknown-roles`) is now deprecated and will be removed in a future major:
+> skipping non-dialogue messages becomes hardcoded behaviour. The misnomer
+> ("unknown roles" — `TOOL`/`OTHER` are first-class AgentCore roles) and the lack of
+> a useful `false` mode mean the toggle has no production value. See
+> [issue #109](https://github.com/spring-ai-community/spring-ai-agentcore/issues/109).
 
 ### LTM Configuration
 
@@ -201,11 +220,9 @@ The repository supports flexible conversation ID formats:
 
 ## Error Handling
 
-```yaml
-agentcore:
-  memory:
-    ignore-unknown-roles: true   # Log warning for unsupported message types
-```
+Messages with non-dialogue roles (e.g. `ToolResponseMessage`, system messages) are skipped with a `WARN` log line rather than persisted, since they are point-in-time facts that should not be replayed from conversation history. This is the only behaviour in 1.1.x and will be hardcoded in the next major.
+
+The legacy `agentcore.memory[.short-term].ignore-unknown-roles` property is **deprecated** in 1.1.0 (`@Deprecated(since = "1.1.0", forRemoval = true)`); setting it logs a deprecation warning at startup and will be removed in the next major. See [issue #109](https://github.com/spring-ai-community/spring-ai-agentcore/issues/109).
 
 All AWS SDK exceptions are wrapped in `AgentCoreMemoryException`.
 
@@ -223,11 +240,11 @@ void deleteByConversationId(String conversationId);
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `agentcore.memory.memory-id` | String | null | AgentCore Memory ID (required) |
-| `agentcore.memory.total-events-limit` | Integer | null | Context window size |
-| `agentcore.memory.default-session` | String | "default-session" | Default session |
-| `agentcore.memory.page-size` | Integer | 100 | API pagination size |
-| `agentcore.memory.ignore-unknown-roles` | Boolean | false | Handle unknown roles |
+| `agentcore.memory.memory-id` | String | null | AgentCore Memory ID (required, shared with LTM) |
+| `agentcore.memory.short-term.total-events-limit` | Integer | null | Context window size |
+| `agentcore.memory.short-term.default-session` | String | "default-session" | Default session |
+| `agentcore.memory.short-term.page-size` | Integer | 100 | API pagination size |
+| `agentcore.memory.short-term.ignore-unknown-roles` | Boolean | true | **Deprecated** (since 1.1.0, for removal). Skipping non-dialogue messages will become hardcoded — see [#109](https://github.com/spring-ai-community/spring-ai-agentcore/issues/109) |
 
 ### Supported Message Types
 
@@ -240,8 +257,8 @@ void deleteByConversationId(String conversationId);
 
 ## Performance
 
-- **Page Size**: Adjust `page-size` based on typical conversation length
-- **Total Limit**: Use `total-events-limit` to control context window size
+- **Page Size**: Adjust `agentcore.memory.short-term.page-size` based on typical conversation length
+- **Total Limit**: Use `agentcore.memory.short-term.total-events-limit` to control context window size
 - **Logging**: Set `org.springaicommunity.agentcore.memory: DEBUG` for detailed logs
 
 ## Troubleshooting
