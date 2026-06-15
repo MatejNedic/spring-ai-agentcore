@@ -16,7 +16,10 @@
 
 package org.springaicommunity.agentcore.browser;
 
+import java.util.List;
+
 import org.springaicommunity.agentcore.artifacts.ArtifactStoreFactory;
+import software.amazon.awssdk.services.bedrockagentcore.model.BrowserEnterprisePolicyType;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -37,13 +40,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param clickDescription custom description for clickElement tool (optional)
  * @param fillDescription custom description for fillForm tool (optional)
  * @param evaluateDescription custom description for evaluateScript tool (optional)
+ * @param enterprisePolicies list of enterprise policy references for AgentCore Browser
+ * sessions (optional, AgentCore mode only)
  * @author Yuriy Bezsonov
  */
 @ConfigurationProperties(prefix = "agentcore.browser")
 public record AgentCoreBrowserConfiguration(String mode, Integer sessionTimeoutSeconds, String browserIdentifier,
 		Integer viewportWidth, Integer viewportHeight, Integer maxContentLength, Integer screenshotTtlSeconds,
 		Integer artifactStoreMaxSize, String browseUrlDescription, String screenshotDescription,
-		String clickDescription, String fillDescription, String evaluateDescription) {
+		String clickDescription, String fillDescription, String evaluateDescription,
+		List<EnterprisePolicyRef> enterprisePolicies) {
 
 	/** Default browser mode. */
 	public static final String DEFAULT_MODE = "agentcore";
@@ -95,6 +101,68 @@ public record AgentCoreBrowserConfiguration(String mode, Integer sessionTimeoutS
 			artifactStoreMaxSize = ArtifactStoreFactory.DEFAULT_MAX_SIZE;
 		}
 		// Tool descriptions can be null - will use defaults from BrowserTools
+		// enterprisePolicies can be null - no policies applied by default
+	}
+
+	/**
+	 * Reference to an enterprise policy stored in S3.
+	 *
+	 * @param s3 the S3 location of the policy JSON file
+	 * @param type the policy type — only {@code RECOMMENDED} is supported for
+	 * StartBrowserSession (validated against {@link BrowserEnterprisePolicyType})
+	 */
+	public record EnterprisePolicyRef(S3Ref s3, String type) {
+
+		public EnterprisePolicyRef {
+			if (s3 == null) {
+				throw new IllegalArgumentException("enterprise policy s3 location is required");
+			}
+			if (type == null || type.isBlank()) {
+				throw new IllegalArgumentException("enterprise policy type is required");
+			}
+			if (policyType(type) != BrowserEnterprisePolicyType.RECOMMENDED) {
+				throw new IllegalArgumentException(
+						"enterprise policy type must be RECOMMENDED for StartBrowserSession; "
+								+ "for MANAGED policies create a custom browser via CreateBrowser and set "
+								+ "agentcore.browser.browser-identifier; got: " + type);
+			}
+		}
+
+		BrowserEnterprisePolicyType policyType() {
+			return policyType(this.type);
+		}
+
+		private static BrowserEnterprisePolicyType policyType(String value) {
+			String normalized = value.trim();
+			for (BrowserEnterprisePolicyType candidate : BrowserEnterprisePolicyType.values()) {
+				if (candidate != BrowserEnterprisePolicyType.UNKNOWN_TO_SDK_VERSION
+						&& candidate.name().equals(normalized)) {
+					return candidate;
+				}
+			}
+			return BrowserEnterprisePolicyType.UNKNOWN_TO_SDK_VERSION;
+		}
+
+	}
+
+	/**
+	 * S3 location reference.
+	 *
+	 * @param bucket the S3 bucket name
+	 * @param prefix the S3 object key (API field name is "prefix")
+	 * @param versionId optional S3 object version ID for pinning
+	 */
+	public record S3Ref(String bucket, String prefix, String versionId) {
+
+		public S3Ref {
+			if (bucket == null || bucket.isBlank()) {
+				throw new IllegalArgumentException("enterprise policy s3 bucket is required");
+			}
+			if (prefix == null || prefix.isBlank()) {
+				throw new IllegalArgumentException("enterprise policy s3 prefix is required");
+			}
+		}
+
 	}
 
 }
