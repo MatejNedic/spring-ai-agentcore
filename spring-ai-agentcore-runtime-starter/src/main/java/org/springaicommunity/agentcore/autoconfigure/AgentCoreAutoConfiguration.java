@@ -28,6 +28,7 @@ import org.springaicommunity.agentcore.ping.AgentCorePingService;
 import org.springaicommunity.agentcore.ping.AgentCoreTaskTracker;
 import org.springaicommunity.agentcore.service.AgentCoreInvocationCallback;
 import org.springaicommunity.agentcore.service.AgentCoreInvocationCallbackRegistry;
+import org.springaicommunity.agentcore.service.AgentCoreInvocationResultHandler;
 import org.springaicommunity.agentcore.service.AgentCoreMethodInvoker;
 import org.springaicommunity.agentcore.service.AgentCoreMethodRegistry;
 import org.springaicommunity.agentcore.service.AgentCoreMethodScanner;
@@ -67,9 +68,18 @@ public class AgentCoreAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
+	public AgentCoreInvocationResultHandler agentCoreInvocationResultHandler() {
+		// Default MVC/blocking behavior: invocation-scoped thread-locals remain valid on
+		// the request thread, so the result is returned unchanged. Overridden by the
+		// reactive handler when Reactor is on the classpath.
+		return (result) -> result;
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
 	public AgentCoreMethodInvoker agentCoreMethodInvoker(ObjectMapper mapper, AgentCoreMethodRegistry registry,
-			AgentCoreInvocationCallbackRegistry callbackRegistry) {
-		return new AgentCoreMethodInvoker(mapper, registry, callbackRegistry);
+			AgentCoreInvocationCallbackRegistry callbackRegistry, AgentCoreInvocationResultHandler resultHandler) {
+		return new AgentCoreMethodInvoker(mapper, registry, callbackRegistry, resultHandler);
 	}
 
 	@Bean

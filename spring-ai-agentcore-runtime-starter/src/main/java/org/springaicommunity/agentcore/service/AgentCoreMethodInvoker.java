@@ -32,11 +32,19 @@ public class AgentCoreMethodInvoker {
 
 	private final AgentCoreInvocationCallbackRegistry callbackRegistry;
 
+	private final AgentCoreInvocationResultHandler resultHandler;
+
 	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry,
 			AgentCoreInvocationCallbackRegistry callbackRegistry) {
+		this(objectMapper, registry, callbackRegistry, (result) -> result);
+	}
+
+	public AgentCoreMethodInvoker(ObjectMapper objectMapper, AgentCoreMethodRegistry registry,
+			AgentCoreInvocationCallbackRegistry callbackRegistry, AgentCoreInvocationResultHandler resultHandler) {
 		this.objectMapper = objectMapper;
 		this.registry = registry;
 		this.callbackRegistry = callbackRegistry;
+		this.resultHandler = resultHandler;
 	}
 
 	public Object invokeAgentMethod(Object request, HttpHeaders headers) throws Exception {
@@ -55,7 +63,12 @@ public class AgentCoreMethodInvoker {
 			Object[] args = this.prepareArguments(request, headers, paramTypes);
 
 			try {
-				return method.invoke(bean, args);
+				Object result = method.invoke(bean, args);
+				// Post-process while invocation-scoped thread-locals (e.g. the workload
+				// access token) are still populated. For reactive results this captures
+				// the context snapshot and pins it onto the returned Flux/Mono, so the
+				// value survives the finally-block cleanup below and any thread hops.
+				return this.resultHandler.handleResult(result);
 			}
 			catch (InvocationTargetException ex) {
 				if (ex.getCause() instanceof Exception exception) {

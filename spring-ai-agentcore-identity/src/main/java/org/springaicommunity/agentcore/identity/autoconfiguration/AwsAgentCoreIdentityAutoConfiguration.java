@@ -17,6 +17,7 @@
 package org.springaicommunity.agentcore.identity.autoconfiguration;
 
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
+import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenAccessor;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenCallback;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenHolder;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
@@ -63,6 +64,23 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 		@ConditionalOnMissingBean
 		WorkloadAccessTokenCallback workloadAccessTokenCallback(WorkloadAccessTokenHolder holder) {
 			return new WorkloadAccessTokenCallback(holder);
+		}
+
+		/**
+		 * Registers the workload access token as a Reactor context-propagation
+		 * {@link io.micrometer.context.ThreadLocalAccessor} so it survives thread hops in
+		 * streaming invocations. Only applies when context-propagation is on the
+		 * classpath.
+		 * @param holder the thread-local holder backing the accessor
+		 * @return the registered workload access token accessor
+		 */
+		@Bean
+		@ConditionalOnClass(io.micrometer.context.ThreadLocalAccessor.class)
+		@ConditionalOnMissingBean
+		WorkloadAccessTokenAccessor workloadAccessTokenAccessor(WorkloadAccessTokenHolder holder) {
+			WorkloadAccessTokenAccessor accessor = new WorkloadAccessTokenAccessor(holder);
+			io.micrometer.context.ContextRegistry.getInstance().registerThreadLocalAccessor(accessor);
+			return accessor;
 		}
 
 	}
