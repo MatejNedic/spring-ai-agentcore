@@ -513,7 +513,7 @@ class CodeInterpreterToolsIT {
 
 		@Bean
 		AgentCoreCodeInterpreterConfiguration codeInterpreterConfiguration() {
-			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null, null);
+			return new AgentCoreCodeInterpreterConfiguration(null, null, null, null, null, null, null, null);
 		}
 
 		@Bean
