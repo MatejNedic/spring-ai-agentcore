@@ -20,20 +20,32 @@ import java.net.URI;
 
 import org.junit.jupiter.api.Test;
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
+import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenHolder;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class AwsAgentCoreIdentityAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(AwsAgentCoreIdentityAutoConfiguration.class));
+
+	@Test
+	void createsBedrockAgentCoreClientUsingDefaultRegionProviderChain() {
+		this.contextRunner.withSystemProperties("aws.region=eu-west-1").run((context) -> {
+			assertThat(context).hasSingleBean(BedrockAgentCoreClient.class);
+			assertThat(context.getBean(BedrockAgentCoreClient.class).serviceClientConfiguration().region())
+				.isEqualTo(Region.EU_WEST_1);
+		});
+	}
 
 	@Test
 	void createsBedrockAgentCoreClient() {
@@ -45,6 +57,16 @@ class AwsAgentCoreIdentityAutoConfigurationTests {
 						.endpointOverride(URI.create("http://localhost:4566"))
 						.build())
 			.run((context) -> assertThat(context).hasSingleBean(BedrockAgentCoreClient.class));
+	}
+
+	@Test
+	void createsAgentCoreIdentityTemplateWithoutRuntimeStarter() {
+		this.contextRunner.withClassLoader(new FilteredClassLoader("org.springaicommunity.agentcore.service"))
+			.withBean(BedrockAgentCoreClient.class, () -> mock(BedrockAgentCoreClient.class))
+			.run((context) -> {
+				assertThat(context).hasSingleBean(AgentCoreIdentityTemplate.class);
+				assertThat(context).doesNotHaveBean(WorkloadAccessTokenHolder.class);
+			});
 	}
 
 	@Test

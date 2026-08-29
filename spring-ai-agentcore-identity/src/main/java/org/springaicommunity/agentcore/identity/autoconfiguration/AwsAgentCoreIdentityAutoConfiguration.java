@@ -16,10 +16,13 @@
 
 package org.springaicommunity.agentcore.identity.autoconfiguration;
 
+import io.micrometer.context.ContextSnapshot;
+import io.micrometer.context.ThreadLocalAccessor;
 import org.springaicommunity.agentcore.identity.core.AgentCoreIdentityTemplate;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenAccessor;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenCallback;
 import org.springaicommunity.agentcore.identity.core.WorkloadAccessTokenHolder;
+import reactor.core.publisher.Flux;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -67,20 +70,29 @@ public class AwsAgentCoreIdentityAutoConfiguration {
 		}
 
 		/**
-		 * Registers the workload access token as a Reactor context-propagation
-		 * {@link io.micrometer.context.ThreadLocalAccessor} so it survives thread hops in
-		 * streaming invocations. Only applies when context-propagation is on the
-		 * classpath.
+		 * Creates the accessor used by Identity's application-context-scoped snapshot
+		 * factory. It does not register the accessor with Micrometer's global registry.
 		 * @param holder the thread-local holder backing the accessor
-		 * @return the registered workload access token accessor
+		 * @return the workload access token accessor
 		 */
 		@Bean
-		@ConditionalOnClass(io.micrometer.context.ThreadLocalAccessor.class)
+		@ConditionalOnClass(ThreadLocalAccessor.class)
 		@ConditionalOnMissingBean
 		WorkloadAccessTokenAccessor workloadAccessTokenAccessor(WorkloadAccessTokenHolder holder) {
-			WorkloadAccessTokenAccessor accessor = new WorkloadAccessTokenAccessor(holder);
-			io.micrometer.context.ContextRegistry.getInstance().registerThreadLocalAccessor(accessor);
-			return accessor;
+			return new WorkloadAccessTokenAccessor(holder);
+		}
+
+		@Configuration
+		@ConditionalOnClass({ Flux.class, ContextSnapshot.class })
+		static class ReactiveContextPropagationConfiguration {
+
+			@Bean
+			@ConditionalOnMissingBean
+			WorkloadAccessTokenContextPropagationCallback workloadAccessTokenContextPropagationCallback(
+					WorkloadAccessTokenAccessor accessor) {
+				return new WorkloadAccessTokenContextPropagationCallback(accessor);
+			}
+
 		}
 
 	}

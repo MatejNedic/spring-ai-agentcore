@@ -16,8 +16,11 @@
 
 package org.springaicommunity.agentcore.identity.core;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.Oauth2FlowType;
@@ -31,71 +34,88 @@ import org.springframework.util.Assert;
  */
 class DefaultGetResourceOauth2TokenConsumerImpl implements GetResourceOauth2TokenConsumer {
 
-	private final GetResourceOauth2TokenRequest.Builder builder = GetResourceOauth2TokenRequest.builder();
+	private final List<Consumer<GetResourceOauth2TokenRequest.Builder>> customizers = new ArrayList<>();
 
 	@Override
 	public GetResourceOauth2TokenConsumer workloadIdentityToken(String workloadIdentityToken) {
 		Assert.hasText(workloadIdentityToken, "workloadIdentityToken must not be null or empty");
-		this.builder.workloadIdentityToken(workloadIdentityToken);
+		this.customizers.add((builder) -> builder.workloadIdentityToken(workloadIdentityToken));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer resourceCredentialProviderName(String resourceCredentialProviderName) {
 		Assert.hasText(resourceCredentialProviderName, "resourceCredentialProviderName must not be null or empty");
-		this.builder.resourceCredentialProviderName(resourceCredentialProviderName);
+		this.customizers.add((builder) -> builder.resourceCredentialProviderName(resourceCredentialProviderName));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer scopes(Collection<String> scopes) {
 		Assert.notNull(scopes, "scopes must not be null");
-		this.builder.scopes(scopes);
+		List<String> values = List.copyOf(scopes);
+		this.customizers.add((builder) -> builder.scopes(values));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer oauth2Flow(Oauth2FlowType oauth2Flow) {
 		Assert.notNull(oauth2Flow, "oauth2Flow must not be null");
-		this.builder.oauth2Flow(oauth2Flow);
+		this.customizers.add((builder) -> builder.oauth2Flow(oauth2Flow));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer sessionUri(String sessionUri) {
-		this.builder.sessionUri(sessionUri);
+		this.customizers.add((builder) -> builder.sessionUri(sessionUri));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer resourceOauth2ReturnUrl(String resourceOauth2ReturnUrl) {
-		this.builder.resourceOauth2ReturnUrl(resourceOauth2ReturnUrl);
+		this.customizers.add((builder) -> builder.resourceOauth2ReturnUrl(resourceOauth2ReturnUrl));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer forceAuthentication(Boolean forceAuthentication) {
-		this.builder.forceAuthentication(forceAuthentication);
+		this.customizers.add((builder) -> builder.forceAuthentication(forceAuthentication));
 		return this;
 	}
 
 	@Override
 	public GetResourceOauth2TokenConsumer customParameters(Map<String, String> customParameters) {
-		this.builder.customParameters(customParameters);
+		Map<String, String> values = (customParameters != null) ? Map.copyOf(customParameters) : null;
+		this.customizers.add((builder) -> builder.customParameters(values));
+		return this;
+	}
+
+	@Override
+	public GetResourceOauth2TokenConsumer customState(String customState) {
+		Assert.hasText(customState, "customState must not be null or empty");
+		this.customizers.add((builder) -> builder.customState(customState));
+		return this;
+	}
+
+	@Override
+	public GetResourceOauth2TokenConsumer resources(Collection<String> resources) {
+		Assert.notNull(resources, "resources must not be null");
+		List<String> values = List.copyOf(resources);
+		this.customizers.add((builder) -> builder.resources(values));
+		return this;
+	}
+
+	@Override
+	public GetResourceOauth2TokenConsumer audiences(Collection<String> audiences) {
+		Assert.notNull(audiences, "audiences must not be null");
+		List<String> values = List.copyOf(audiences);
+		this.customizers.add((builder) -> builder.audiences(values));
 		return this;
 	}
 
 	@Override
 	public void accept(GetResourceOauth2TokenRequest.Builder builder) {
-		GetResourceOauth2TokenRequest request = this.builder.build();
-		builder.workloadIdentityToken(request.workloadIdentityToken())
-			.resourceCredentialProviderName(request.resourceCredentialProviderName())
-			.scopes(request.scopes())
-			.oauth2Flow(request.oauth2Flow())
-			.sessionUri(request.sessionUri())
-			.resourceOauth2ReturnUrl(request.resourceOauth2ReturnUrl())
-			.forceAuthentication(request.forceAuthentication())
-			.customParameters(request.customParameters());
+		this.customizers.forEach((customizer) -> customizer.accept(builder));
 	}
 
 }

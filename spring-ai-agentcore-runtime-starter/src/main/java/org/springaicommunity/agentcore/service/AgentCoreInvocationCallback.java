@@ -21,13 +21,13 @@ import org.springframework.http.HttpHeaders;
 
 /**
  * Callback interface invoked before and after each {@code @AgentCoreInvocation} method
- * execution. Implementations may inspect or enrich the request context (e.g., extract
- * tokens from headers into thread-local storage).
+ * execution. Implementations may inspect or enrich the request context, transform the
+ * invocation result, or clean up invocation-scoped state.
  *
  * <p>
- * Multiple callbacks are executed in {@link Ordered} order. The {@link #afterInvocation}
- * method is guaranteed to run in a {@code finally} block, even when the invocation
- * throws.
+ * Multiple callbacks are executed in {@link Ordered} order. Result processing happens
+ * before {@link #afterInvocation}, which is guaranteed to run in a {@code finally} block
+ * even when the invocation throws.
  *
  * @author Matej Nedic
  */
@@ -39,6 +39,18 @@ public interface AgentCoreInvocationCallback extends Ordered {
 	 * @param headers the HTTP headers from the invocation request
 	 */
 	void beforeInvocation(Object request, HttpHeaders headers);
+
+	/**
+	 * Processes the value returned by the {@code @AgentCoreInvocation} method while the
+	 * invocation context is still active.
+	 * @param request the deserialized request body
+	 * @param headers the HTTP headers from the invocation request
+	 * @param result the value returned by the invocation method
+	 * @return the value to return from the invocation
+	 */
+	default Object processResult(Object request, HttpHeaders headers, Object result) {
+		return result;
+	}
 
 	/**
 	 * Called after the {@code @AgentCoreInvocation} method completes (or throws).

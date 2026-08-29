@@ -18,9 +18,10 @@ package org.springaicommunity.agentcore.identity.core;
 
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenResponse;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -31,8 +32,14 @@ import org.springframework.util.Assert;
  * <ul>
  * <li>Workload access token retrieval (from JWT, user ID, or workload name alone)</li>
  * <li>API key retrieval from a credential provider vault</li>
- * <li>OAuth 2.0 token retrieval (USER_FEDERATION and M2M flows)</li>
+ * <li>OAuth 2.0 token retrieval ({@code USER_FEDERATION}, {@code M2M}, and
+ * {@code ON_BEHALF_OF_TOKEN_EXCHANGE} flows)</li>
  * </ul>
+ *
+ * <p>
+ * AWS service and client failures are intentionally propagated unchanged so callers can
+ * inspect AWS error details, retryability, request IDs, and HTTP status codes. In a
+ * reactive pipeline, invoke this blocking template on a bounded-elastic scheduler.
  *
  * @author Matej Nedic
  * @see <a href=
@@ -137,15 +144,29 @@ public class AgentCoreIdentityTemplate {
 	}
 
 	/**
-	 * Retrieves an OAuth 2.0 access token from the AgentCore Identity credential vault.
-	 * Supports both {@code USER_FEDERATION} (3LO authorization code) and {@code M2M}
-	 * (client credentials) flows depending on the credential provider configuration.
-	 * @param consumer configures the OAuth 2.0 token request (provider name, scopes, flow
-	 * type)
-	 * @return the OAuth 2.0 access token
+	 * Retrieves the complete OAuth 2.0 response from AgentCore Identity. The response can
+	 * contain an access token for completed M2M, on-behalf-of, or USER_FEDERATION flows.
+	 * When user consent is required, it instead contains the authorization URL, session
+	 * URI, and session status needed to complete the authorization flow.
+	 * @param consumer configures all OAuth 2.0 request fields, including provider,
+	 * scopes, flow, audience/resource targeting, callback URL, and CSRF state
+	 * @return the complete AgentCore Identity OAuth 2.0 response
 	 */
-	public String getOauthToken(Consumer<GetResourceOauth2TokenConsumer> consumer) {
-		return this.client.getResourceOauth2Token(GetResourceOauth2TokenConsumer.of(consumer)).accessToken();
+	public GetResourceOauth2TokenResponse getOauthToken(Consumer<GetResourceOauth2TokenConsumer> consumer) {
+		Assert.notNull(consumer, "consumer must not be null");
+		return this.client.getResourceOauth2Token(GetResourceOauth2TokenConsumer.of(consumer));
+	}
+
+	/**
+	 * Retrieves only the OAuth 2.0 access token. This convenience method is intended for
+	 * requests that resolve immediately, such as M2M and on-behalf-of token exchange. Use
+	 * {@link #getOauthToken(Consumer)} when USER_FEDERATION can require authorization.
+	 * @param consumer configures the OAuth 2.0 token request
+	 * @return the OAuth 2.0 access token, or {@code null} when user authorization is
+	 * required
+	 */
+	public @Nullable String getOauthAccessToken(Consumer<GetResourceOauth2TokenConsumer> consumer) {
+		return this.getOauthToken(consumer).accessToken();
 	}
 
 	/**

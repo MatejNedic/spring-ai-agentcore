@@ -23,11 +23,10 @@ import io.micrometer.context.ThreadLocalAccessor;
  * {@link WorkloadAccessTokenHolder} thread-local with the Reactor {@code Context}.
  *
  * <p>
- * Registering this accessor with the global {@code ContextRegistry} lets Reactor capture
- * the workload access token into the {@code Context} at assembly time and restore it onto
- * whichever scheduler thread runs a reactive operator. This is what allows the blocking
- * {@link AgentCoreIdentityTemplate#getApiKey(String)} API to keep working when invoked
- * lazily inside a streaming {@code Flux}/{@code Mono}.
+ * AgentCore Identity registers this accessor only with a context registry owned by the
+ * application context. It captures the workload access token into a reactive result's
+ * Reactor {@code Context} without changing Reactor's JVM-global hooks or Micrometer's
+ * global registry.
  *
  * @author Matej Nedic
  */

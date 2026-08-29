@@ -35,11 +35,14 @@ class GetResourceOauth2TokenConsumerTests {
 			.of((c) -> c.workloadIdentityToken("wit-123")
 				.resourceCredentialProviderName("my-provider")
 				.scopes("read", "write")
-				.oauth2Flow(Oauth2FlowType.M2_M)
+				.oauth2Flow(Oauth2FlowType.ON_BEHALF_OF_TOKEN_EXCHANGE)
 				.sessionUri("https://session.example.com")
 				.resourceOauth2ReturnUrl("https://return.example.com")
 				.forceAuthentication(true)
-				.customParameters(Map.of("key", "value")));
+				.customParameters(Map.of("key", "value"))
+				.customState("csrf-state")
+				.resources("https://resource.example.com")
+				.audiences("api-audience"));
 
 		GetResourceOauth2TokenRequest.Builder builder = GetResourceOauth2TokenRequest.builder();
 		consumer.accept(builder);
@@ -48,11 +51,31 @@ class GetResourceOauth2TokenConsumerTests {
 		assertThat(request.workloadIdentityToken()).isEqualTo("wit-123");
 		assertThat(request.resourceCredentialProviderName()).isEqualTo("my-provider");
 		assertThat(request.scopes()).containsExactly("read", "write");
-		assertThat(request.oauth2Flow()).isEqualTo(Oauth2FlowType.M2_M);
+		assertThat(request.oauth2Flow()).isEqualTo(Oauth2FlowType.ON_BEHALF_OF_TOKEN_EXCHANGE);
 		assertThat(request.sessionUri()).isEqualTo("https://session.example.com");
 		assertThat(request.resourceOauth2ReturnUrl()).isEqualTo("https://return.example.com");
 		assertThat(request.forceAuthentication()).isTrue();
 		assertThat(request.customParameters()).containsEntry("key", "value");
+		assertThat(request.customState()).isEqualTo("csrf-state");
+		assertThat(request.resources()).containsExactly("https://resource.example.com");
+		assertThat(request.audiences()).containsExactly("api-audience");
+	}
+
+	@Test
+	void preservesAbsentOptionalCollectionAndMapFields() {
+		GetResourceOauth2TokenConsumer consumer = GetResourceOauth2TokenConsumer
+			.of((c) -> c.workloadIdentityToken("wit")
+				.resourceCredentialProviderName("provider")
+				.oauth2Flow(Oauth2FlowType.M2_M));
+
+		GetResourceOauth2TokenRequest.Builder builder = GetResourceOauth2TokenRequest.builder();
+		consumer.accept(builder);
+		GetResourceOauth2TokenRequest request = builder.build();
+
+		assertThat(request.hasScopes()).isFalse();
+		assertThat(request.hasCustomParameters()).isFalse();
+		assertThat(request.hasResources()).isFalse();
+		assertThat(request.hasAudiences()).isFalse();
 	}
 
 	@Test
@@ -83,6 +106,29 @@ class GetResourceOauth2TokenConsumerTests {
 			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.workloadIdentityToken("t")
 				.resourceCredentialProviderName("p")
 				.scopes((Collection<String>) null)));
+	}
+
+	@Test
+	void rejectsNullResources() {
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.resources((Collection<String>) null)));
+	}
+
+	@Test
+	void rejectsNullAudiences() {
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.audiences((Collection<String>) null)));
+	}
+
+	@Test
+	void rejectsEmptyCustomState() {
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> GetResourceOauth2TokenConsumer.of((c) -> c.customState("")));
+	}
+
+	@Test
+	void rejectsNullConsumer() {
+		assertThatIllegalArgumentException().isThrownBy(() -> GetResourceOauth2TokenConsumer.of(null));
 	}
 
 }

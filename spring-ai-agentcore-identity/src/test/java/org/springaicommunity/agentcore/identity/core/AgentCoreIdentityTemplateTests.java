@@ -21,15 +21,22 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+import software.amazon.awssdk.services.bedrockagentcore.model.CompleteResourceTokenAuthRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.CompleteResourceTokenAuthResponse;
+import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceApiKeyRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceApiKeyResponse;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetResourceOauth2TokenResponse;
+import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenForJwtRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenForJwtResponse;
+import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenForUserIdRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenForUserIdResponse;
+import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.GetWorkloadAccessTokenResponse;
+import software.amazon.awssdk.services.bedrockagentcore.model.SessionStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -52,11 +59,20 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void getWorkloadAccessTokenForJwtReturnsToken() {
 		given(this.client.getWorkloadAccessTokenForJWT(any(Consumer.class)))
 			.willReturn(GetWorkloadAccessTokenForJwtResponse.builder().workloadAccessToken("wat-123").build());
 
 		String token = this.template.getWorkloadAccessTokenForJwt("my-jwt", "my-workload");
+
+		ArgumentCaptor<Consumer<GetWorkloadAccessTokenForJwtRequest.Builder>> captor = ArgumentCaptor
+			.forClass(Consumer.class);
+		then(this.client).should().getWorkloadAccessTokenForJWT(captor.capture());
+		GetWorkloadAccessTokenForJwtRequest.Builder request = GetWorkloadAccessTokenForJwtRequest.builder();
+		captor.getValue().accept(request);
+		assertThat(request.build().userToken()).isEqualTo("my-jwt");
+		assertThat(request.build().workloadName()).isEqualTo("my-workload");
 		assertThat(token).isEqualTo("wat-123");
 	}
 
@@ -72,11 +88,19 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void getApiKeyReturnsKey() {
 		given(this.client.getResourceApiKey(any(Consumer.class)))
 			.willReturn(GetResourceApiKeyResponse.builder().apiKey("key-456").build());
 
 		String apiKey = this.template.getApiKey("token", "my-provider");
+
+		ArgumentCaptor<Consumer<GetResourceApiKeyRequest.Builder>> captor = ArgumentCaptor.forClass(Consumer.class);
+		then(this.client).should().getResourceApiKey(captor.capture());
+		GetResourceApiKeyRequest.Builder request = GetResourceApiKeyRequest.builder();
+		captor.getValue().accept(request);
+		assertThat(request.build().workloadIdentityToken()).isEqualTo("token");
+		assertThat(request.build().resourceCredentialProviderName()).isEqualTo("my-provider");
 		assertThat(apiKey).isEqualTo("key-456");
 	}
 
@@ -91,13 +115,35 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
-	void getOauthTokenReturnsAccessToken() {
+	void getOauthAccessTokenReturnsAccessToken() {
 		given(this.client.getResourceOauth2Token(any(Consumer.class)))
 			.willReturn(GetResourceOauth2TokenResponse.builder().accessToken("oauth-789").build());
 
-		String token = this.template.getOauthToken(
+		String token = this.template.getOauthAccessToken(
 				(c) -> c.workloadIdentityToken("wit").resourceCredentialProviderName("provider").scopes("read"));
 		assertThat(token).isEqualTo("oauth-789");
+	}
+
+	@Test
+	void getOauthTokenReturnsAuthorizationSession() {
+		GetResourceOauth2TokenResponse response = GetResourceOauth2TokenResponse.builder()
+			.authorizationUrl("https://provider.example.com/authorize")
+			.sessionUri("urn:ietf:params:oauth:request_uri:session-123")
+			.sessionStatus(SessionStatus.IN_PROGRESS)
+			.build();
+		given(this.client.getResourceOauth2Token(any(Consumer.class))).willReturn(response);
+
+		GetResourceOauth2TokenResponse actual = this.template.getOauthToken(
+				(c) -> c.workloadIdentityToken("wit").resourceCredentialProviderName("provider").scopes("read"));
+
+		assertThat(actual.authorizationUrl()).isEqualTo("https://provider.example.com/authorize");
+		assertThat(actual.sessionUri()).isEqualTo("urn:ietf:params:oauth:request_uri:session-123");
+		assertThat(actual.sessionStatus()).isEqualTo(SessionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void getOauthTokenRejectsNullConsumer() {
+		assertThatIllegalArgumentException().isThrownBy(() -> this.template.getOauthToken(null));
 	}
 
 	@Test
@@ -106,11 +152,20 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void getWorkloadAccessTokenForUserIdReturnsToken() {
 		given(this.client.getWorkloadAccessTokenForUserId(any(Consumer.class)))
 			.willReturn(GetWorkloadAccessTokenForUserIdResponse.builder().workloadAccessToken("wat-user-456").build());
 
 		String token = this.template.getWorkloadAccessTokenForUserId("user123", "my-workload");
+
+		ArgumentCaptor<Consumer<GetWorkloadAccessTokenForUserIdRequest.Builder>> captor = ArgumentCaptor
+			.forClass(Consumer.class);
+		then(this.client).should().getWorkloadAccessTokenForUserId(captor.capture());
+		GetWorkloadAccessTokenForUserIdRequest.Builder request = GetWorkloadAccessTokenForUserIdRequest.builder();
+		captor.getValue().accept(request);
+		assertThat(request.build().userId()).isEqualTo("user123");
+		assertThat(request.build().workloadName()).isEqualTo("my-workload");
 		assertThat(token).isEqualTo("wat-user-456");
 	}
 
@@ -127,11 +182,19 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void getWorkloadAccessTokenReturnsToken() {
 		given(this.client.getWorkloadAccessToken(any(Consumer.class)))
 			.willReturn(GetWorkloadAccessTokenResponse.builder().workloadAccessToken("wat-simple-789").build());
 
 		String token = this.template.getWorkloadAccessToken("my-workload");
+
+		ArgumentCaptor<Consumer<GetWorkloadAccessTokenRequest.Builder>> captor = ArgumentCaptor
+			.forClass(Consumer.class);
+		then(this.client).should().getWorkloadAccessToken(captor.capture());
+		GetWorkloadAccessTokenRequest.Builder request = GetWorkloadAccessTokenRequest.builder();
+		captor.getValue().accept(request);
+		assertThat(request.build().workloadName()).isEqualTo("my-workload");
 		assertThat(token).isEqualTo("wat-simple-789");
 	}
 
@@ -141,12 +204,20 @@ class AgentCoreIdentityTemplateTests {
 	}
 
 	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void completeResourceTokenAuthCallsClient() {
 		given(this.client.completeResourceTokenAuth(any(Consumer.class)))
 			.willReturn(CompleteResourceTokenAuthResponse.builder().build());
 
 		this.template.completeResourceTokenAuth("https://callback.example.com/session/123", "my-jwt");
-		then(this.client).should().completeResourceTokenAuth(any(Consumer.class));
+
+		ArgumentCaptor<Consumer<CompleteResourceTokenAuthRequest.Builder>> captor = ArgumentCaptor
+			.forClass(Consumer.class);
+		then(this.client).should().completeResourceTokenAuth(captor.capture());
+		CompleteResourceTokenAuthRequest.Builder request = CompleteResourceTokenAuthRequest.builder();
+		captor.getValue().accept(request);
+		assertThat(request.build().sessionUri()).isEqualTo("https://callback.example.com/session/123");
+		assertThat(request.build().userIdentifier().userToken()).isEqualTo("my-jwt");
 	}
 
 	@Test
