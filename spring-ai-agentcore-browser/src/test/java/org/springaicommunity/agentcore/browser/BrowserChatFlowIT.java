@@ -19,6 +19,7 @@ package org.springaicommunity.agentcore.browser;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springaicommunity.agentcore.artifacts.ArtifactStore;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Yuriy Bezsonov
  */
+@Tag("integration")
 @EnabledIfEnvironmentVariable(named = "AGENTCORE_IT", matches = "true")
 @SpringBootTest(classes = BrowserChatFlowIT.TestApp.class)
 @DisplayName("Browser ChatClient Flow Integration Tests")
@@ -157,7 +159,7 @@ class BrowserChatFlowIT {
 			BedrockChatOptions options = BedrockChatOptions.builder()
 				.model("global.anthropic.claude-sonnet-4-5-20250929-v1:0")
 				.build();
-			return BedrockProxyChatModel.builder().defaultOptions(options).build();
+			return BedrockProxyChatModel.builder().options(options).build();
 		}
 
 		@Bean

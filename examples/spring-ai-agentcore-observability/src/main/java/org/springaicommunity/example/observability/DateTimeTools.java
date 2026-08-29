@@ -13,8 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.springaicommunity.example.observability;
 
-/**
- * short-term chat memory backed by the AgentCore Memory service.
- */
-package org.springaicommunity.agentcore.memory.shorttem;
+import java.time.LocalDateTime;
+
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.context.i18n.LocaleContextHolder;
+
+class DateTimeTools {
+
+	@Tool(description = "Get the current date and time in the user's timezone")
+	String getCurrentDateTime() {
+		return LocalDateTime.now().atZone(LocaleContextHolder.getTimeZone().toZoneId()).toString();
+	}
+
+}

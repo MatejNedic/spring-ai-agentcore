@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import software.amazon.awssdk.regions.Region;
@@ -30,6 +31,7 @@ import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
  * Live probe for the AgentCore Evaluate API. Enabled via
  * {@code AGENTCORE_EVAL_PROBE=true}.
  */
+@Tag("integration")
 @EnabledIfEnvironmentVariable(named = "AGENTCORE_EVAL_PROBE", matches = "true")
 class AgentCoreEvaluationClientProbeIT {
 
@@ -66,7 +68,7 @@ class AgentCoreEvaluationClientProbeIT {
 		log.put("body", body);
 		try {
 			List<EvaluationResult> r = this.client.evaluate(EVALUATOR_ID, List.of(span, log));
-			EvaluationResult res = (r.isEmpty()) ? null : r.getFirst();
+			EvaluationResult res = (r.isEmpty()) ? null : r.get(0);
 			System.out.printf("[%s] size=%d score=%s err=%s%n", name, r.size(), (res != null) ? res.score() : null,
 					(res != null) ? res.errorCode() : null);
 		}

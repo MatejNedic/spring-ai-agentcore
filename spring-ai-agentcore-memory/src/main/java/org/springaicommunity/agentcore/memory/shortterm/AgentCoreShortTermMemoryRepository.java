@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.springaicommunity.agentcore.memory.shorttem;
+package org.springaicommunity.agentcore.memory.shortterm;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -268,6 +268,11 @@ public class AgentCoreShortTermMemoryRepository implements ChatMemoryRepository 
 			else {
 				throw new IllegalStateException("Unsupported message type: " + message.getClass().getSimpleName());
 			}
+		}
+
+		if (message.getText() == null || message.getText().isBlank()) {
+			logger.debug("Skipping empty-text message for role {}: {}", role, message.getClass().getSimpleName());
+			return null;
 		}
 
 		var content = Content.builder().text(message.getText()).build();

@@ -1,2 +1,3 @@
 org.springaicommunity.agentcore.autoconfigure.AgentCoreAutoConfiguration
 org.springaicommunity.agentcore.autoconfigure.AgentCoreReactiveAutoConfiguration
+org.springaicommunity.agentcore.autoconfigure.AgentCoreObservabilityAutoConfiguration

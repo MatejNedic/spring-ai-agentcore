@@ -40,6 +40,9 @@ import software.amazon.awssdk.http.auth.spi.signer.SignedRequest;
 import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockagentcore.BedrockAgentCoreClient;
+import software.amazon.awssdk.services.bedrockagentcore.model.BrowserEnterprisePolicy;
+import software.amazon.awssdk.services.bedrockagentcore.model.ResourceLocation;
+import software.amazon.awssdk.services.bedrockagentcore.model.S3Location;
 import software.amazon.awssdk.services.bedrockagentcore.model.StartBrowserSessionRequest;
 import software.amazon.awssdk.services.bedrockagentcore.model.StartBrowserSessionResponse;
 import software.amazon.awssdk.services.bedrockagentcore.model.StopBrowserSessionRequest;
@@ -54,6 +57,13 @@ import software.amazon.awssdk.services.bedrockagentcore.model.ViewPort;
 public class AgentCoreBrowserClient implements BrowserClient {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreBrowserClient.class);
+
+	/**
+	 * Navigation and action timeout. Heavy pages can exceed Playwright's 30s default, so
+	 * navigation, load-state waits, and locator actions use a more generous ceiling to
+	 * reduce spurious timeouts.
+	 */
+	private static final double NAVIGATION_TIMEOUT_MS = 60_000;
 
 	private final BedrockAgentCoreClient client;
 
@@ -176,15 +186,8 @@ public class AgentCoreBrowserClient implements BrowserClient {
 
 		try {
 			logger.info("Starting browser session: {}", sessionName);
-			StartBrowserSessionResponse response = this.client.startBrowserSession(StartBrowserSessionRequest.builder()
-				.browserIdentifier(this.config.browserIdentifier())
-				.name(sessionName)
-				.sessionTimeoutSeconds(this.config.sessionTimeoutSeconds())
-				.viewPort(ViewPort.builder()
-					.width(this.config.viewportWidth())
-					.height(this.config.viewportHeight())
-					.build())
-				.build());
+			StartBrowserSessionResponse response = this.client
+				.startBrowserSession(this.buildStartSessionRequest(sessionName));
 
 			sessionId = response.sessionId();
 			String wsEndpoint = response.streams().automationStream().streamEndpoint();
@@ -220,6 +223,8 @@ public class AgentCoreBrowserClient implements BrowserClient {
 			Page page = (context.pages().isEmpty()) ? context.newPage() : context.pages().get(0);
 
 			logger.info("Navigating to: {}", targetUrl);
+			page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
+			page.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
 			page.navigate(targetUrl);
 			page.waitForLoadState();
 
@@ -273,6 +278,45 @@ public class AgentCoreBrowserClient implements BrowserClient {
 
 		logger.debug("Generated WebSocket headers: {}", headers.keySet());
 		return new WsConnection(wsEndpoint, headers);
+	}
+
+	private static List<BrowserEnterprisePolicy> toSdkPolicies(
+			List<AgentCoreBrowserConfiguration.EnterprisePolicyRef> refs) {
+		if (refs == null || refs.isEmpty()) {
+			return List.of();
+		}
+		return refs.stream()
+			.map((ref) -> BrowserEnterprisePolicy.builder()
+				.location(ResourceLocation.builder()
+					.s3(S3Location.builder()
+						.bucket(ref.s3().bucket())
+						.prefix(ref.s3().prefix())
+						.versionId(ref.s3().versionId())
+						.build())
+					.build())
+				.type(ref.policyType())
+				.build())
+			.toList();
+	}
+
+	StartBrowserSessionRequest buildStartSessionRequest(String sessionName) {
+		StartBrowserSessionRequest.Builder requestBuilder = StartBrowserSessionRequest.builder()
+			.browserIdentifier(this.config.browserIdentifier())
+			.name(sessionName)
+			.sessionTimeoutSeconds(this.config.sessionTimeoutSeconds())
+			.viewPort(
+					ViewPort.builder().width(this.config.viewportWidth()).height(this.config.viewportHeight()).build());
+
+		List<BrowserEnterprisePolicy> policies = toSdkPolicies(this.config.enterprisePolicies());
+		if (!policies.isEmpty()) {
+			requestBuilder.enterprisePolicies(policies);
+			logger.info("Applying {} enterprise policies to session '{}': {}", policies.size(), sessionName,
+					this.config.enterprisePolicies()
+						.stream()
+						.map((ref) -> "s3://" + ref.s3().bucket() + "/" + ref.s3().prefix())
+						.toList());
+		}
+		return requestBuilder.build();
 	}
 
 	private void stopSession(String sessionId) {

@@ -25,7 +25,7 @@ Add the BOM and dependency:
         <dependency>
             <groupId>org.springaicommunity</groupId>
             <artifactId>spring-ai-agentcore-bom</artifactId>
-            <version>${version}</version>  <!-- Use latest: 1.0.0-RC2, 1.0.0-RC3, etc. -->
+            <version>1.0.0</version>  <!-- or the latest release -->
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -132,6 +132,34 @@ agentcore.browser.click-description=...
 agentcore.browser.fill-description=...
 agentcore.browser.evaluate-description=...
 ```
+
+### Enterprise policies (AgentCore mode)
+
+In **agentcore** mode you can attach Chromium enterprise policies (for example `URLBlocklist` / `URLAllowlist`) stored as JSON in S3. Policies are passed to `StartBrowserSession` on each ephemeral browser session.
+
+Only `RECOMMENDED` policy type is supported here. For `MANAGED` (cannot-override) policies, create a custom browser with `CreateBrowser` and reference it via `agentcore.browser.browser-identifier`.
+
+**Local mode:** enterprise policies for this starter are **not** wired in code. Local Chromium reads managed policies from OS-specific paths (for example `/etc/chromium/policies/managed/` on Linux). There is no `--policy-dir` launch flag; document and install policies at the OS level for local development.
+
+The parent POM pins AWS SDK `bedrockagentcore` **2.44.12** (minimum **2.42.17** for `StartBrowserSessionRequest.enterprisePolicies`).
+
+```yaml
+agentcore:
+  browser:
+    mode: agentcore
+    enterprise-policies:
+      - s3:
+          bucket: corp-browser-policies
+          prefix: policies/production/recommended.json
+          version-id: optional-pinned-version
+        type: RECOMMENDED
+      - s3:
+          bucket: corp-browser-policies
+          prefix: policies/production/allowlist.json
+        type: RECOMMENDED
+```
+
+The runtime role needs `s3:GetObject` on the policy objects. See [Browser enterprise policies](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-enterprise-policies.html).
 
 ## Artifact Store
 

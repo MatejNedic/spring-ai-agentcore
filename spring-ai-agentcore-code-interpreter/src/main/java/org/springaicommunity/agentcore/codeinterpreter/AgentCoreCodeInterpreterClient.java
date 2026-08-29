@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,10 +53,6 @@ public class AgentCoreCodeInterpreterClient {
 
 	private static final Logger logger = LoggerFactory.getLogger(AgentCoreCodeInterpreterClient.class);
 
-	/** File extensions to retrieve from session (user-generated files). */
-	private static final Set<String> RETRIEVABLE_EXTENSIONS = Set.of(".png", ".jpg", ".jpeg", ".gif", ".pdf", ".csv",
-			".xlsx", ".xls", ".json", ".txt", ".html");
-
 	/** Paths to exclude from file listing (system directories). */
 	private static final Set<String> EXCLUDED_PATHS = Set.of("__pycache__", ".cache", ".local", ".config", ".ipython");
 
@@ -69,6 +66,10 @@ public class AgentCoreCodeInterpreterClient {
 
 	private final int asyncTimeoutSeconds;
 
+	private final FileRetrievalPolicy fileRetrievalPolicy;
+
+	private final Set<String> retrievableExtensions;
+
 	public AgentCoreCodeInterpreterClient(BedrockAgentCoreClient syncClient, BedrockAgentCoreAsyncClient asyncClient,
 			AgentCoreCodeInterpreterConfiguration config) {
 		this.syncClient = syncClient;
@@ -76,8 +77,13 @@ public class AgentCoreCodeInterpreterClient {
 		this.codeInterpreterIdentifier = config.codeInterpreterIdentifier();
 		this.sessionTimeoutSeconds = config.sessionTimeoutSeconds();
 		this.asyncTimeoutSeconds = config.asyncTimeoutSeconds();
-		logger.debug("AgentCoreCodeInterpreterClient initialized: identifier={}, sessionTimeout={}s, asyncTimeout={}s",
-				this.codeInterpreterIdentifier, this.sessionTimeoutSeconds, this.asyncTimeoutSeconds);
+		this.fileRetrievalPolicy = config.fileRetrievalPolicy();
+		this.retrievableExtensions = config.retrievableExtensions();
+		logger.debug(
+				"AgentCoreCodeInterpreterClient initialized: identifier={}, sessionTimeout={}s, "
+						+ "asyncTimeout={}s, policy={}",
+				this.codeInterpreterIdentifier, this.sessionTimeoutSeconds, this.asyncTimeoutSeconds,
+				this.fileRetrievalPolicy);
 	}
 
 	/**
@@ -228,7 +234,8 @@ public class AgentCoreCodeInterpreterClient {
 	}
 
 	/**
-	 * Execute code in a new ephemeral session with automatic file retrieval.
+	 * Execute code in a new ephemeral session with automatic file retrieval, using the
+	 * configured default {@link FileRetrievalPolicy}.
 	 * <p>
 	 * Flow: startSession → executeCode → listFiles → readFiles → stopSession
 	 * @param language programming language
@@ -236,21 +243,47 @@ public class AgentCoreCodeInterpreterClient {
 	 * @return execution result with text output and retrieved files
 	 */
 	public CodeExecutionResult executeInEphemeralSession(String language, String code) {
-		String sessionName = "ephemeral-" + System.currentTimeMillis();
+		return this.executeInEphemeralSession(language, code, this.fileRetrievalPolicy);
+	}
+
+	/**
+	 * Execute code in a new ephemeral session, retrieving files according to the given
+	 * {@link FileRetrievalPolicy}.
+	 * @param language programming language
+	 * @param code code to execute
+	 * @param policy which files to return (see {@link FileRetrievalPolicy})
+	 * @return execution result with text output and retrieved files
+	 */
+	public CodeExecutionResult executeInEphemeralSession(String language, String code, FileRetrievalPolicy policy) {
+		String sessionName = "ephemeral-" + UUID.randomUUID();
 		String sessionId = this.startSession(sessionName);
 		try {
+			// For RESULT_ONLY we never inspect the filesystem, so skip the baseline
+			// snapshot. Otherwise, snapshot files already present in a freshly started
+			// sandbox so they are not misattributed as output of this execution.
+			List<String> baselineFiles = (policy == FileRetrievalPolicy.RESULT_ONLY) ? Collections.emptyList()
+					: this.listFiles(sessionId, "");
+
 			// Execute code
 			CodeExecutionResult execResult = this.executeCode(sessionId, language, code);
 
-			// Retrieve generated files
+			// Inline result files are always returned.
 			List<GeneratedFile> files = new ArrayList<>(execResult.files());
-			List<String> sessionFiles = this.listFiles(sessionId, "");
-			List<String> filesToRetrieve = this.filterRetrievableFiles(sessionFiles);
 
-			if (!filesToRetrieve.isEmpty()) {
-				logger.debug("Retrieving {} files from session", filesToRetrieve.size());
-				List<GeneratedFile> retrievedFiles = this.readFiles(sessionId, filesToRetrieve);
-				files.addAll(retrievedFiles);
+			// For GENERATED/ALL, also retrieve files created during this execution
+			// (post minus baseline). GENERATED additionally filters to known output
+			// types.
+			if (policy != FileRetrievalPolicy.RESULT_ONLY) {
+				List<String> sessionFiles = new ArrayList<>(this.listFiles(sessionId, ""));
+				sessionFiles.removeAll(baselineFiles);
+				List<String> filesToRetrieve = (policy == FileRetrievalPolicy.ALL) ? sessionFiles
+						: this.filterRetrievableFiles(sessionFiles);
+
+				if (!filesToRetrieve.isEmpty()) {
+					logger.debug("Retrieving {} files from session (policy={})", filesToRetrieve.size(), policy);
+					List<GeneratedFile> retrievedFiles = this.readFiles(sessionId, filesToRetrieve);
+					files.addAll(retrievedFiles);
+				}
 			}
 
 			return new CodeExecutionResult(execResult.textOutput(), execResult.isError(), files);
@@ -380,7 +413,7 @@ public class AgentCoreCodeInterpreterClient {
 		List<String> retrievable = new ArrayList<>();
 		for (String file : allFiles) {
 			String lower = file.toLowerCase();
-			for (String ext : RETRIEVABLE_EXTENSIONS) {
+			for (String ext : this.retrievableExtensions) {
 				if (lower.endsWith(ext)) {
 					retrievable.add(file);
 					break;
