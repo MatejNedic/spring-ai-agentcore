@@ -42,8 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = EndToEndWebFluxIntegrationTests.FluxTestApp.class,
-		webEnvironment = WebEnvironment.RANDOM_PORT,
-		properties = "spring.main.web-application-type=reactive")
+		webEnvironment = WebEnvironment.RANDOM_PORT, properties = "spring.main.web-application-type=reactive")
 class EndToEndWebFluxIntegrationTests {
 
 	@LocalServerPort
