@@ -22,15 +22,15 @@ import org.springaicommunity.agentcore.annotation.AgentCoreInvocation;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(classes = ReactiveRateLimitingWebFilterTests.ReactiveTestApp.class,
-		webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = { "spring.main.web-application-type=reactive", "agentcore.throttle.invocations-limit=2",
-				"agentcore.throttle.ping-limit=3" })
+		webEnvironment = WebEnvironment.RANDOM_PORT, properties = { "spring.main.web-application-type=reactive",
+				"agentcore.throttle.invocations-limit=2", "agentcore.throttle.ping-limit=3" })
 class ReactiveRateLimitingWebFilterTests {
 
 	private static final String X_FORWARDED_FOR = "X-Forwarded-For";
